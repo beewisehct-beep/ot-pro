@@ -470,6 +470,8 @@ function init(){
   curYear=new Date().getFullYear();
   liff.init({liffId:"2009520328-4YznojXl"})
     .then(()=>{
+      // ถ้าไม่ได้เปิดในแอป LINE ให้ใช้โหมด Local แทน ไม่ redirect
+      if(!liff.isInClient()){throw new Error("not_in_line");}
       if(!liff.isLoggedIn()){liff.login();return;}
       return liff.getProfile();
     })

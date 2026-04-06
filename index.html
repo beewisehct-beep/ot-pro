@@ -464,33 +464,41 @@ const WORK=[
 const SUCCESS=["น้องเวรภูมิใจในคุณมากค่ะ! 🔥","OT ทุกชั่วโมงมีค่านะคะ 💰","สู้ตลอดเลยค่ะ เก่งมากเลย! ⚡","ทุกเวรที่จด = เงินที่ได้จริงค่ะ 💸","ยอดมากเลยค่ะ เงินในกระเป๋าแน่นขึ้นแล้ว! ✨"];
 
 function init(){
-  updateClock();setInterval(updateClock,1000);setDefaultDate();setSpeech(IDLE);
-  // Reset sumMonth to current real date
-  sumMonth=new Date();
-  curYear=new Date().getFullYear();
-  liff.init({liffId:"2009520328-4YznojXl"})
-    .then(()=>{
-      // ถ้าไม่ได้เปิดในแอป LINE ให้ใช้โหมด Local แทน ไม่ redirect
-      if(!liff.isInClient()){throw new Error("not_in_line");}
-      if(!liff.isLoggedIn()){liff.login();return;}
+  updateClock(); setInterval(updateClock, 1000); setDefaultDate(); setSpeech(IDLE);
+  sumMonth = new Date();
+  curYear = new Date().getFullYear();
+
+  liff.init({ liffId: "2009520328-4YznojXl" })
+    .then(() => {
+      // ถ้าไม่ได้เปิดใน LINE → บังคับ login ไม่ให้เข้าแบบ fallback
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
       return liff.getProfile();
     })
-    .then(profile=>{
-      if(!profile)return;
-      uid=profile.userId;uname=profile.displayName;
-      document.getElementById("profName").textContent=uname;
-      document.getElementById("settingName").textContent=uname;
-      document.getElementById("nameInput").value=uname;
+    .then(profile => {
+      if (!profile) return;
+      uid = profile.userId;
+      uname = profile.displayName;
+      document.getElementById("profName").textContent = uname;
+      document.getElementById("settingName").textContent = uname;
+      document.getElementById("nameInput").value = uname;
       showApp();
     })
-    .catch(()=>{
-      uid=localStorage.getItem("ot_uid")||("u_"+Date.now().toString(36));
-      localStorage.setItem("ot_uid",uid);
-      uname=localStorage.getItem("ot_name")||"สมาชิก";
-      document.getElementById("profName").textContent=uname;
-      document.getElementById("settingName").textContent=uname;
-      showApp();
+    .catch(err => {
+      // แสดงหน้า error แทน — ไม่ให้ใช้ uid ปลอม
+      document.getElementById("loadingScreen").innerHTML = `
+        <div style="text-align:center;padding:40px 24px;">
+          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
+          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
+            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
+            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
+          </div>
+        </div>`;
     });
+
   makeDraggable(document.getElementById("mascotWrap"));
 }
 

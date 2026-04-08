@@ -579,6 +579,7 @@ async function clockOut(){
     document.getElementById("zzzSpan").style.display="";setSpeech(IDLE);
     yearlyData={};
     showOv("+"+money.toLocaleString()+" บาท",tt(new Date(Date.now()-hrs*3600000))+" – "+tt(now)+"  ·  "+hrs+" ชม.");
+    loadSummary(); // ✅ refresh หน้าเดือนอัตโนมัติ
   }catch(e){showErr("errClock","เกิดข้อผิดพลาด ลองใหม่นะคะ");resetBtn();}
 }
 function resetBtn(){const b=document.getElementById("btnOut");b.disabled=false;b.innerHTML='<span class="icon">🔴</span><span>ออกเวร</span><span class="sub">กดเพื่อบันทึก</span>';}
@@ -637,12 +638,25 @@ function renderSummary(recs){
     const inputDate=parts.length===3?parts[2]+"-"+parts[1].padStart(2,"0")+"-"+parts[0].padStart(2,"0"):"";
     return `<div class="rec-item" id="rec-${i}">
       <div style="flex:1">
-        <div class="rec-date">📅 ${d} <button onclick="toggleEditDate(${i},'${inputDate}')" style="background:none;border:1px solid var(--teal-pp);color:var(--teal-d);border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;margin-left:6px;">✏️</button></div>
+        <div class="rec-date">📅 ${d}
+          <button onclick="toggleEdit(${i},'${inputDate}')" style="background:none;border:1px solid var(--teal-pp);color:var(--teal-d);border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;margin-left:6px;">✏️ แก้ไข</button>
+          <button onclick="confirmDelete(${i})" style="background:none;border:1px solid #ffcdd2;color:#e53935;border-radius:6px;padding:2px 7px;font-size:10px;cursor:pointer;margin-left:4px;">🗑️ ลบ</button>
+        </div>
         ${timeStr?`<div class="rec-time">⏰ ${timeStr}</div>`:""}
         <div class="edit-date-form" id="edit-form-${i}">
-          <div style="font-size:11px;color:var(--text-l);margin-bottom:6px;font-weight:600;">แก้ไขวันที่</div>
-          <div class="edit-row"><input type="date" id="edit-date-${i}" value="${inputDate}"><button class="btn-save-edit" onclick="saveEditDate(${i})">บันทึก</button></div>
-          <button class="btn-cancel-edit" onclick="cancelEdit(${i})">ยกเลิก</button>
+          <div style="font-size:11px;color:var(--text-l);margin-bottom:8px;font-weight:700;">✏️ แก้ไขข้อมูล</div>
+          <div style="margin-bottom:8px;">
+            <label style="font-size:11px;color:var(--text-l);font-weight:600;margin-bottom:4px;display:block;">📅 วันที่</label>
+            <input type="date" id="edit-date-${i}" value="${inputDate}" style="width:100%;padding:8px 10px;border:1.5px solid var(--teal-pp);border-radius:10px;font-size:13px;">
+          </div>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--text-l);font-weight:600;margin-bottom:4px;display:block;">⏱️ ชั่วโมง OT</label>
+            <input type="number" id="edit-hrs-${i}" value="${hrs}" step="0.5" min="0.5" max="24" style="width:100%;padding:8px 10px;border:1.5px solid var(--teal-pp);border-radius:10px;font-size:13px;">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="btn-save-edit" onclick="saveEdit(${i})">💾 บันทึก</button>
+            <button class="btn-cancel-edit" style="margin-top:0;" onclick="cancelEdit(${i})">ยกเลิก</button>
+          </div>
         </div>
       </div>
       <div class="rec-right"><div class="rec-hrs">${hrs} ชม.</div><div class="rec-money">฿${Math.round(money).toLocaleString()}</div></div>
@@ -650,7 +664,7 @@ function renderSummary(recs){
   }).join("");
 }
 
-function toggleEditDate(i,cd){
+function toggleEdit(i,cd){
   const form=document.getElementById("edit-form-"+i),item=document.getElementById("rec-"+i);
   const isOpen=form.classList.contains("show");
   document.querySelectorAll(".edit-date-form").forEach(f=>f.classList.remove("show"));
@@ -658,14 +672,41 @@ function toggleEditDate(i,cd){
   if(!isOpen){form.classList.add("show");item.classList.add("editing");editingIdx=i;}else editingIdx=null;
 }
 function cancelEdit(i){document.getElementById("edit-form-"+i).classList.remove("show");document.getElementById("rec-"+i).classList.remove("editing");editingIdx=null;}
-async function saveEditDate(i){
-  const ndi=document.getElementById("edit-date-"+i).value;if(!ndi)return;
-  const rec=currentRecs[i];const[y,m,d]=ndi.split("-");const newDate=parseInt(d)+"/"+parseInt(m)+"/"+parseInt(y);
+
+async function saveEdit(i){
+  const ndi=document.getElementById("edit-date-"+i).value;
+  const newHrs=parseFloat(document.getElementById("edit-hrs-"+i).value);
+  if(!ndi){alert("กรุณาเลือกวันที่ค่ะ");return;}
+  if(isNaN(newHrs)||newHrs<=0){alert("กรุณากรอกชั่วโมงให้ถูกต้องค่ะ");return;}
+  const rec=currentRecs[i];
+  const[y,m,d]=ndi.split("-");
+  const newDate=parseInt(d)+"/"+parseInt(m)+"/"+parseInt(y);
+  const newMoney=Math.round(newHrs*rate);
   try{
-    const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"editOT",userId:uid,oldDate:rec.date,newDate,hours:rec.hours,startTime:rec.startTime||"",endTime:rec.endTime||""})});
+    const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"editOT",userId:uid,oldDate:rec.date,newDate,hours:newHrs,startTime:rec.startTime||"",endTime:rec.endTime||""})});
     const data=await r.json();
-    if(data.result==="ok"){currentRecs[i].date=newDate;renderSummary(currentRecs);showOv("","","แก้ไขวันที่เป็น "+newDate+" แล้วค่ะ ✅");}
-    else alert("แก้ไขไม่สำเร็จค่ะ");
+    if(data.result==="ok"){
+      currentRecs[i].date=newDate;
+      currentRecs[i].hours=newHrs;
+      currentRecs[i].money=newMoney;
+      renderSummary(currentRecs);
+      showOv("","","แก้ไขเรียบร้อยแล้วค่ะ ✅");
+    } else alert("แก้ไขไม่สำเร็จค่ะ");
+  }catch(e){alert("เกิดข้อผิดพลาดค่ะ");}
+}
+
+async function confirmDelete(i){
+  const rec=currentRecs[i];
+  if(!confirm(`ลบ OT วันที่ ${rec.date} (${rec.hours} ชม.) ออกเลยนะคะ?`))return;
+  try{
+    const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"deleteOT",userId:uid,date:rec.date,hours:rec.hours})});
+    const data=await r.json();
+    if(data.result==="ok"){
+      currentRecs.splice(i,1);
+      yearlyData={};
+      renderSummary(currentRecs);
+      showOv("","","ลบข้อมูลแล้วค่ะ 🗑️");
+    } else alert("ลบไม่สำเร็จค่ะ");
   }catch(e){alert("เกิดข้อผิดพลาดค่ะ");}
 }
 

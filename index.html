@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/nicusor-draghici/sarabun-font-jspdf/Sarabun-normal.js"></script>
@@ -906,7 +907,61 @@ function makeDraggable(el){
   window.addEventListener("mousemove",move);window.addEventListener("touchmove",move,{passive:false});
   window.addEventListener("mouseup",end);window.addEventListener("touchend",end);
 }
-init();
+function init(){
+  updateClock(); setInterval(updateClock, 1000); setDefaultDate();
+  setSpeech(IDLE);
+  sumMonth = new Date();
+  curYear = new Date().getFullYear();
+
+  // ✅ เพิ่ม timeout กันค้าง
+  const liffTimeout = setTimeout(() => {
+    document.getElementById("loadingScreen").innerHTML = `
+      <div style="text-align:center;padding:40px 24px;">
+        <div style="font-size:48px;margin-bottom:16px;">⏱️</div>
+        <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">โหลดนานผิดปกติ</div>
+        <div style="font-size:13px;color:#546E7A;line-height:1.6;">
+          กรุณากดปุ่มด้านล่างเพื่อลองใหม่ค่ะ
+        </div>
+        <button onclick="location.reload()" 
+          style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
+          🔄 ลองใหม่
+        </button>
+      </div>`;
+  }, 10000); // 10 วินาที
+
+  liff.init({ liffId: "2009520328-4YznojXl" })
+    .then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      return liff.getProfile();
+    })
+    .then(profile => {
+      clearTimeout(liffTimeout); // ✅ ยกเลิก timeout ถ้าสำเร็จ
+      if (!profile) return;
+      uid = profile.userId;
+      uname = profile.displayName;
+      document.getElementById("profName").textContent = uname;
+      document.getElementById("settingName").textContent = uname;
+      document.getElementById("nameInput").value = uname;
+      showApp();
+    })
+    .catch(err => {
+      clearTimeout(liffTimeout); // ✅ ยกเลิก timeout ถ้า error
+      document.getElementById("loadingScreen").innerHTML = `
+        <div style="text-align:center;padding:40px 24px;">
+          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
+          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
+            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
+            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
+          </div>
+          <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${err.message||""}</div>
+        </div>`;
+    });
+  makeDraggable(document.getElementById("mascotWrap"));
+}
 </script>
 </body>
 </html>

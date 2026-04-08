@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Oh my เวร - Pro</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -39,7 +37,7 @@ body::after{
   pointer-events:none;z-index:0;
 }
 .container{max-width:440px;margin:0 auto;padding:0 0 60px;}
-โ/* HEADER — dark teal block behind nurse */
+/* HEADER — dark teal block behind nurse */
 .app-header{
   background:linear-gradient(150deg,#5271c4 0%,#6b8ee8 35%,#94b9ff 70%,#aecfff 100%);
   padding:0 18px 0;
@@ -462,19 +460,44 @@ const WORK=[
 ];
 const SUCCESS=["น้องเวรภูมิใจในคุณมากค่ะ! 🔥","OT ทุกชั่วโมงมีค่านะคะ 💰","สู้ตลอดเลยค่ะ เก่งมากเลย! ⚡","ทุกเวรที่จด = เงินที่ได้จริงค่ะ 💸","ยอดมากเลยค่ะ เงินในกระเป๋าแน่นขึ้นแล้ว! ✨"];
 
+function showLoadingError(msg) {
+  document.getElementById("loadingScreen").innerHTML = `
+    <div style="text-align:center;padding:40px 24px;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">โหลดไม่สำเร็จ</div>
+      <div style="font-size:13px;color:#546E7A;line-height:1.6;">${msg}</div>
+      <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">กรุณาปิดแล้วเปิดใหม่ผ่าน LINE ค่ะ</div>
+      <button onclick="location.reload()"
+        style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
+        🔄 ลองใหม่
+      </button>
+    </div>`;
+}
+
 function init(){
   updateClock(); setInterval(updateClock, 1000); setDefaultDate(); setSpeech(IDLE);
   sumMonth = new Date();
   curYear = new Date().getFullYear();
+  makeDraggable(document.getElementById("mascotWrap"));
 
-  liff.init({ liffId: "2009520328-4YznojXl" })
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("LIFF timeout — กรุณาเปิดผ่าน LINE ค่ะ")), 12000)
+  );
+
+  Promise.race([
+    liff.init({ liffId: "2009520328-4YznojXl" }),
+    timeout
+  ])
     .then(() => {
-      // ถ้าไม่ได้เปิดใน LINE → บังคับ login ไม่ให้เข้าแบบ fallback
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return;
+      if (liff.isInClient()) {
+        return liff.getProfile();
+      } else {
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+        return liff.getProfile();
       }
-      return liff.getProfile();
     })
     .then(profile => {
       if (!profile) return;
@@ -486,19 +509,8 @@ function init(){
       showApp();
     })
     .catch(err => {
-      // แสดงหน้า error แทน — ไม่ให้ใช้ uid ปลอม
-      document.getElementById("loadingScreen").innerHTML = `
-        <div style="text-align:center;padding:40px 24px;">
-          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
-          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
-            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
-            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
-          </div>
-        </div>`;
+      showLoadingError(err.message || "เกิดข้อผิดพลาดค่ะ");
     });
-
-  makeDraggable(document.getElementById("mascotWrap"));
 }
 function showApp(){
   document.getElementById("loadingScreen").classList.add("hide");
@@ -890,34 +902,9 @@ function makeDraggable(el){
   window.addEventListener("mousemove",move);window.addEventListener("touchmove",move,{passive:false});
   window.addEventListener("mouseup",end);window.addEventListener("touchend",end);
 }
-function init(){
-  updateClock(); setInterval(updateClock, 1000); setDefaultDate();
-  setSpeech(IDLE);
-  sumMonth = new Date();
-  curYear = new Date().getFullYear();
-  makeDraggable(document.getElementById("mascotWrap"));
-
-  // test timeout ก่อนว่าทำงานได้ไหม
-  setTimeout(() => {
-    alert("JS ทำงานได้ค่ะ — กำลัง init LIFF...");
-  }, 2000);
-
-  liff.init({ liffId: "2009520328-4YznojXl" })
-    .then(() => {
-      alert("liff.init สำเร็จ! isLoggedIn = " + liff.isLoggedIn());
-      if (!liff.isLoggedIn()) { liff.login(); return; }
-      return liff.getProfile();
-    })
-    .then(profile => {
-      if (!profile) return;
-      uid = profile.userId;
-      uname = profile.displayName;
-      document.getElementById("profName").textContent = uname;
-      document.getElementById("settingName").textContent = uname;
-      document.getElementById("nameInput").value = uname;
-      showApp();
-    })
-    .catch(err => {
-      alert("❌ Error: " + err.message);
-    });
-}
+init();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</body>
+</html>

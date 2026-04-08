@@ -4,23 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Oh my เวร - Pro</title>
-
-  <!-- LIFF SDK อันเดียว -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
-  <!-- PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/nicusor-draghici/sarabun-font-jspdf/Sarabun-normal.js"></script>
-
-  <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --teal:#00BCD4;--teal-d:#00838F;--teal-dd:#006064;
   --teal-l:#4DD0E1;--teal-p:#E0F7FA;--teal-pp:#B2EBF2;
   --green:#26A69A;--green-l:#80CBC4;--green-p:#E0F2F1;
-  /* alias for buttons/accents */
   --blue:#00838F;--blue-m:#006064;--blue-l:#00ACC1;--blue-ll:#4DD0E1;
   --cyan:#00BCD4;--cyan-l:#4DD0E1;--cyan-p:#E0F7FA;
   --text:#1A2B3C;--text-l:#546E7A;
@@ -47,8 +39,7 @@ body::after{
   pointer-events:none;z-index:0;
 }
 .container{max-width:440px;margin:0 auto;padding:0 0 60px;}
-
-/* HEADER — dark teal block behind nurse */
+โ/* HEADER — dark teal block behind nurse */
 .app-header{
   background:linear-gradient(150deg,#5271c4 0%,#6b8ee8 35%,#94b9ff 70%,#aecfff 100%);
   padding:0 18px 0;
@@ -673,27 +664,13 @@ function initPDF(title) {
     const { jsPDF } = window.jspdf;
     if (!jsPDF) { alert("❌ โหลด jsPDF ไม่ได้ค่ะ"); return null; }
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("Sarabun");
-    // ... โค้ดเดิม
-    return doc;
-  } catch(e) {
-    alert("❌ Error: " + e.message);
-    return null;
-  }
-function initPDF(title) {
-  try {
-    const { jsPDF } = window.jspdf;
-    if (!jsPDF) { alert("❌ โหลด jsPDF ไม่ได้ค่ะ"); return null; }
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    if (typeof doc.setFont === "function") {
-      try { doc.setFont("Sarabun"); } catch(e) { doc.setFont("helvetica"); }
-    }
+    doc.setFont("helvetica");
     doc.setFontSize(16);
     doc.setTextColor(0, 131, 143);
     doc.text(title, 14, 18);
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
-    doc.text("Oh my เวร Pro  |  " + new Date().toLocaleDateString("th-TH"), 14, 25);
+    doc.text("Oh my Wern Pro  |  " + new Date().toLocaleDateString("th-TH"), 14, 25);
     doc.setDrawColor(0, 131, 143);
     doc.setLineWidth(0.5);
     doc.line(14, 27, 196, 27);
@@ -707,7 +684,7 @@ function initPDF(title) {
 function exportMonthPDF() {
   if (!currentRecs.length) { alert("ไม่มีข้อมูลค่ะ"); return; }
   const mo = sumMonth.getMonth() + 1, y = sumMonth.getFullYear();
-  const doc = initPDF("สรุป OT เดือน " + TH_MONTHS[mo - 1] + " " + y);
+  const doc = initPDF("OT Month " + mo + "/" + y);
   if (!doc) return;
   const rows = currentRecs.map(r => {
     const hrs = parseFloat(r.hours) || 0;
@@ -716,14 +693,14 @@ function exportMonthPDF() {
   });
   const totHrs = currentRecs.reduce((a, r) => a + (parseFloat(r.hours) || 0), 0);
   const totMoney = currentRecs.reduce((a, r) => a + (parseFloat(r.money) || Math.round((parseFloat(r.hours) || 0) * rate)), 0);
-  rows.push(["รวม", totHrs.toFixed(1), "", "", Math.round(totMoney).toLocaleString()]);
+  rows.push(["Total", totHrs.toFixed(1), "", "", Math.round(totMoney).toLocaleString()]);
   try {
     doc.autoTable({
       startY: 32,
-      head: [["วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
+      head: [["Date", "Hours", "Start", "End", "Income (B)"]],
       body: rows,
-      styles: { fontSize: 10, halign: "center", font: "Sarabun" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
+      styles: { fontSize: 10, halign: "center", font: "helvetica" },
+      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
       didParseCell(data) {
         if (data.row.index === rows.length - 1) {
           data.cell.styles.fontStyle = "bold";
@@ -731,13 +708,13 @@ function exportMonthPDF() {
         }
       }
     });
-    doc.save(TH_MONTHS[mo - 1] + "_" + y + "_OT.pdf");
-  } catch(e) { alert("❌ สร้าง PDF ไม่ได้: " + e.message); }
+    doc.save("OT_" + mo + "_" + y + ".pdf");
+  } catch(e) { alert("❌ PDF Error: " + e.message); }
 }
 
 async function exportCumulativePDF() {
   const btn = document.getElementById("btnCumulative");
-  btn.textContent = "⏳ กำลังโหลด..."; btn.disabled = true;
+  btn.textContent = "⏳ Loading..."; btn.disabled = true;
   try {
     const now = new Date(), endY = now.getFullYear(), endM = now.getMonth() + 1;
     const fetches = [];
@@ -751,7 +728,7 @@ async function exportCumulativePDF() {
         .then(r => r.json()).then(d => ({ y, m, records: d.records || [] })).catch(() => ({ y, m, records: [] }))
     ));
     results.sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
-    const doc = initPDF("สรุป OT รวมทั้งหมด");
+    const doc = initPDF("OT All Records");
     if (!doc) return;
     const rows = [];
     let gH = 0, gM = 0, gC = 0;
@@ -760,18 +737,18 @@ async function exportCumulativePDF() {
       records.forEach(r => {
         const hrs = parseFloat(r.hours) || 0;
         const money = parseFloat(r.money) || Math.round(hrs * rate);
-        rows.push([TH_MONTHS[m - 1] + " " + y, r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
+        rows.push([m + "/" + y, r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
         gH += hrs; gM += money; gC++;
       });
     });
     if (!rows.length) { alert("ไม่มีข้อมูลเลยค่ะ"); return; }
-    rows.push(["รวม (" + gC + " ครั้ง)", "", gH.toFixed(1), "", "", Math.round(gM).toLocaleString()]);
+    rows.push(["Total (" + gC + ")", "", gH.toFixed(1), "", "", Math.round(gM).toLocaleString()]);
     doc.autoTable({
       startY: 32,
-      head: [["เดือน", "วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
+      head: [["Month", "Date", "Hours", "Start", "End", "Income (B)"]],
       body: rows,
-      styles: { fontSize: 9, halign: "center", font: "Sarabun" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
+      styles: { fontSize: 9, halign: "center", font: "helvetica" },
+      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
       didParseCell(data) {
         if (data.row.index === rows.length - 1) {
           data.cell.styles.fontStyle = "bold";
@@ -779,7 +756,7 @@ async function exportCumulativePDF() {
         }
       }
     });
-    doc.save("OT_รวมทุกเดือน_ถึง_" + TH_MONTHS[endM - 1] + "_" + endY + ".pdf");
+    doc.save("OT_All_" + endM + "_" + endY + ".pdf");
   } catch (e) { alert("❌ PDF Error: " + e.message); }
   finally { btn.textContent = "📋 PDF รวมทั้งหมด"; btn.disabled = false; }
 }
@@ -787,28 +764,28 @@ async function exportCumulativePDF() {
 function exportYearPDF() {
   const data = yearlyData[curYear];
   if (!data) { alert("กรุณารอโหลดข้อมูลก่อนค่ะ"); return; }
-  const doc = initPDF("สรุป OT ประจำปี " + curYear);
+  const doc = initPDF("OT Year " + curYear);
   if (!doc) return;
   const rows = [];
   data.forEach(m => {
     m.records.forEach(r => {
       const hrs = parseFloat(r.hours) || 0;
       const money = parseFloat(r.money) || Math.round(hrs * rate);
-      rows.push([TH_MONTHS[m.month - 1], r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
+      rows.push([m.month + "/" + curYear, r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
     });
   });
   if (!rows.length) { alert("ไม่มีข้อมูลปีนี้ค่ะ"); return; }
   const totH = data.reduce((a, m) => a + m.hours, 0);
   const totM = data.reduce((a, m) => a + m.money, 0);
   const totC = data.reduce((a, m) => a + m.count, 0);
-  rows.push(["รวมทั้งปี (" + totC + " ครั้ง)", "", totH.toFixed(1), "", "", Math.round(totM).toLocaleString()]);
+  rows.push(["Total (" + totC + ")", "", totH.toFixed(1), "", "", Math.round(totM).toLocaleString()]);
   try {
     doc.autoTable({
       startY: 32,
-      head: [["เดือน", "วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
+      head: [["Month", "Date", "Hours", "Start", "End", "Income (B)"]],
       body: rows,
-      styles: { fontSize: 9, halign: "center", font: "Sarabun" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
+      styles: { fontSize: 9, halign: "center", font: "helvetica" },
+      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
       didParseCell(data) {
         if (data.row.index === rows.length - 1) {
           data.cell.styles.fontStyle = "bold";
@@ -816,9 +793,10 @@ function exportYearPDF() {
         }
       }
     });
-    doc.save("OT_สรุปปี_" + curYear + ".pdf");
-  } catch(e) { alert("❌ สร้าง PDF ไม่ได้: " + e.message); }
+    doc.save("OT_Year_" + curYear + ".pdf");
+  } catch(e) { alert("❌ PDF Error: " + e.message); }
 }
+
 async function loadRate(){
   try{
     const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getRate",userId:uid})});
@@ -917,47 +895,17 @@ function init(){
   setSpeech(IDLE);
   sumMonth = new Date();
   curYear = new Date().getFullYear();
+  makeDraggable(document.getElementById("mascotWrap"));
 
-  const liffTimeout = setTimeout(() => {
-    document.getElementById("loadingScreen").innerHTML = `
-      <div style="text-align:center;padding:40px 24px;">
-        <div style="font-size:48px;margin-bottom:16px;">⏱️</div>
-        <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">โหลดนานผิดปกติ</div>
-        <div style="font-size:13px;color:#546E7A;line-height:1.6;">กรุณากดปุ่มด้านล่างเพื่อลองใหม่ค่ะ</div>
-        <button onclick="location.reload()"
-          style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
-          🔄 ลองใหม่
-        </button>
-      </div>`;
-  }, 10000);
+  // test timeout ก่อนว่าทำงานได้ไหม
+  setTimeout(() => {
+    alert("JS ทำงานได้ค่ะ — กำลัง init LIFF...");
+  }, 2000);
 
   liff.init({ liffId: "2009520328-4YznojXl" })
     .then(() => {
-      clearTimeout(liffTimeout);
-
-      // ✅ ถ้ายังไม่ login → login แค่ครั้งเดียว ไม่ loop
-      if (!liff.isLoggedIn()) {
-        // เช็คว่าเคย redirect มาแล้วยัง
-        if (sessionStorage.getItem("liff_redirected")) {
-          // redirect แล้วยังไม่ login → แสดง error
-          sessionStorage.removeItem("liff_redirected");
-          document.getElementById("loadingScreen").innerHTML = `
-            <div style="text-align:center;padding:40px 24px;">
-              <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-              <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
-              <div style="font-size:13px;color:#546E7A;line-height:1.6;">
-                Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
-                กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
-              </div>
-            </div>`;
-          return;
-        }
-        sessionStorage.setItem("liff_redirected", "1");
-        liff.login();
-        return;
-      }
-
-      sessionStorage.removeItem("liff_redirected");
+      alert("liff.init สำเร็จ! isLoggedIn = " + liff.isLoggedIn());
+      if (!liff.isLoggedIn()) { liff.login(); return; }
       return liff.getProfile();
     })
     .then(profile => {
@@ -970,18 +918,6 @@ function init(){
       showApp();
     })
     .catch(err => {
-      clearTimeout(liffTimeout);
-      document.getElementById("loadingScreen").innerHTML = `
-        <div style="text-align:center;padding:40px 24px;">
-          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
-          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
-            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
-            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
-          </div>
-          <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${err.message||""}</div>
-        </div>`;
+      alert("❌ Error: " + err.message);
     });
-
-  makeDraggable(document.getElementById("mascotWrap"));
 }

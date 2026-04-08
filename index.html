@@ -663,25 +663,46 @@ async function saveEditDate(i){
 function changeMonth(d){sumMonth.setMonth(sumMonth.getMonth()+d);if(uid)loadSummary();}
 
 function initPDF(title) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  doc.setFont("Sarabun");
-  doc.setFontSize(16);
-  doc.setTextColor(0, 131, 143);
-  doc.text(title, 14, 18);
-  doc.setFontSize(9);
-  doc.setTextColor(120, 120, 120);
-  doc.text("Oh my เวร Pro  |  " + new Date().toLocaleDateString("th-TH"), 14, 25);
-  doc.setDrawColor(0, 131, 143);
-  doc.setLineWidth(0.5);
-  doc.line(14, 27, 196, 27);
-  return doc;
+  try {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) { alert("❌ โหลด jsPDF ไม่ได้ค่ะ"); return null; }
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    doc.setFont("Sarabun");
+    // ... โค้ดเดิม
+    return doc;
+  } catch(e) {
+    alert("❌ Error: " + e.message);
+    return null;
+  }
+function initPDF(title) {
+  try {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) { alert("❌ โหลด jsPDF ไม่ได้ค่ะ"); return null; }
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    if (typeof doc.setFont === "function") {
+      try { doc.setFont("Sarabun"); } catch(e) { doc.setFont("helvetica"); }
+    }
+    doc.setFontSize(16);
+    doc.setTextColor(0, 131, 143);
+    doc.text(title, 14, 18);
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Oh my เวร Pro  |  " + new Date().toLocaleDateString("th-TH"), 14, 25);
+    doc.setDrawColor(0, 131, 143);
+    doc.setLineWidth(0.5);
+    doc.line(14, 27, 196, 27);
+    return doc;
+  } catch(e) {
+    alert("❌ PDF Error: " + e.message);
+    return null;
+  }
 }
 
 function exportMonthPDF() {
   if (!currentRecs.length) { alert("ไม่มีข้อมูลค่ะ"); return; }
   const mo = sumMonth.getMonth() + 1, y = sumMonth.getFullYear();
   const doc = initPDF("สรุป OT เดือน " + TH_MONTHS[mo - 1] + " " + y);
+  if (!doc) return;
   const rows = currentRecs.map(r => {
     const hrs = parseFloat(r.hours) || 0;
     const money = parseFloat(r.money) || Math.round(hrs * rate);
@@ -690,20 +711,22 @@ function exportMonthPDF() {
   const totHrs = currentRecs.reduce((a, r) => a + (parseFloat(r.hours) || 0), 0);
   const totMoney = currentRecs.reduce((a, r) => a + (parseFloat(r.money) || Math.round((parseFloat(r.hours) || 0) * rate)), 0);
   rows.push(["รวม", totHrs.toFixed(1), "", "", Math.round(totMoney).toLocaleString()]);
-  doc.autoTable({
-    startY: 32,
-    head: [["วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
-    body: rows,
-    styles: { fontSize: 10, halign: "center", font: "Sarabun" },
-    headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
-    didParseCell(data) {
-      if (data.row.index === rows.length - 1) {
-        data.cell.styles.fontStyle = "bold";
-        data.cell.styles.fillColor = [224, 247, 250];
+  try {
+    doc.autoTable({
+      startY: 32,
+      head: [["วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
+      body: rows,
+      styles: { fontSize: 10, halign: "center", font: "Sarabun" },
+      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
+      didParseCell(data) {
+        if (data.row.index === rows.length - 1) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [224, 247, 250];
+        }
       }
-    }
-  });
-  doc.save(TH_MONTHS[mo - 1] + "_" + y + "_OT.pdf");
+    });
+    doc.save(TH_MONTHS[mo - 1] + "_" + y + "_OT.pdf");
+  } catch(e) { alert("❌ สร้าง PDF ไม่ได้: " + e.message); }
 }
 
 async function exportCumulativePDF() {
@@ -723,6 +746,7 @@ async function exportCumulativePDF() {
     ));
     results.sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
     const doc = initPDF("สรุป OT รวมทั้งหมด");
+    if (!doc) return;
     const rows = [];
     let gH = 0, gM = 0, gC = 0;
     results.forEach(({ y, m, records }) => {
@@ -734,6 +758,7 @@ async function exportCumulativePDF() {
         gH += hrs; gM += money; gC++;
       });
     });
+    if (!rows.length) { alert("ไม่มีข้อมูลเลยค่ะ"); return; }
     rows.push(["รวม (" + gC + " ครั้ง)", "", gH.toFixed(1), "", "", Math.round(gM).toLocaleString()]);
     doc.autoTable({
       startY: 32,
@@ -749,7 +774,7 @@ async function exportCumulativePDF() {
       }
     });
     doc.save("OT_รวมทุกเดือน_ถึง_" + TH_MONTHS[endM - 1] + "_" + endY + ".pdf");
-  } catch (e) { alert("เกิดข้อผิดพลาดค่ะ"); }
+  } catch (e) { alert("❌ PDF Error: " + e.message); }
   finally { btn.textContent = "📋 PDF รวมทั้งหมด"; btn.disabled = false; }
 }
 
@@ -757,6 +782,7 @@ function exportYearPDF() {
   const data = yearlyData[curYear];
   if (!data) { alert("กรุณารอโหลดข้อมูลก่อนค่ะ"); return; }
   const doc = initPDF("สรุป OT ประจำปี " + curYear);
+  if (!doc) return;
   const rows = [];
   data.forEach(m => {
     m.records.forEach(r => {
@@ -765,24 +791,27 @@ function exportYearPDF() {
       rows.push([TH_MONTHS[m.month - 1], r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
     });
   });
+  if (!rows.length) { alert("ไม่มีข้อมูลปีนี้ค่ะ"); return; }
   const totH = data.reduce((a, m) => a + m.hours, 0);
   const totM = data.reduce((a, m) => a + m.money, 0);
   const totC = data.reduce((a, m) => a + m.count, 0);
   rows.push(["รวมทั้งปี (" + totC + " ครั้ง)", "", totH.toFixed(1), "", "", Math.round(totM).toLocaleString()]);
-  doc.autoTable({
-    startY: 32,
-    head: [["เดือน", "วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
-    body: rows,
-    styles: { fontSize: 9, halign: "center", font: "Sarabun" },
-    headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
-    didParseCell(data) {
-      if (data.row.index === rows.length - 1) {
-        data.cell.styles.fontStyle = "bold";
-        data.cell.styles.fillColor = [224, 247, 250];
+  try {
+    doc.autoTable({
+      startY: 32,
+      head: [["เดือน", "วันที่", "ชั่วโมง", "เวลาเข้า", "เวลาออก", "รายได้ (฿)"]],
+      body: rows,
+      styles: { fontSize: 9, halign: "center", font: "Sarabun" },
+      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "Sarabun" },
+      didParseCell(data) {
+        if (data.row.index === rows.length - 1) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [224, 247, 250];
+        }
       }
-    }
-  });
-  doc.save("OT_สรุปปี_" + curYear + ".pdf");
+    });
+    doc.save("OT_สรุปปี_" + curYear + ".pdf");
+  } catch(e) { alert("❌ สร้าง PDF ไม่ได้: " + e.message); }
 }
 async function loadRate(){
   try{

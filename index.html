@@ -467,7 +467,13 @@ function init(){
   makeDraggable(document.getElementById("mascotWrap"));
 
   liff.init({ liffId: "2009520328-4YznojXl" })
-    .then(() => liff.getProfile())
+    .then(() => {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return null;
+      }
+      return liff.getProfile();
+    })
     .then(profile => {
       if (!profile) return;
       uid = profile.userId;
@@ -475,10 +481,21 @@ function init(){
       document.getElementById("profName").textContent = uname;
       document.getElementById("settingName").textContent = uname;
       document.getElementById("nameInput").value = uname;
+      // บันทึก user เข้า Sheet + link rich menu
+      fetch(GAS, {method:"POST", body:JSON.stringify({
+        action:"saveUser", userId:uid, name:uname, rate:0
+      })});
       showApp();
     })
     .catch(err => {
       const msg = err.message || JSON.stringify(err) || "";
+      // token หมดอายุ / ไม่มี token → login ใหม่
+      if (msg.includes("expired") || msg.includes("401") ||
+          msg.includes("access token") || msg.includes("login") ||
+          msg.includes("Need") || msg.includes("unauthorized")) {
+        liff.login();
+        return;
+      }
       document.getElementById("loadingScreen").innerHTML = `
         <div style="text-align:center;padding:40px 24px;">
           <div style="font-size:48px;margin-bottom:16px;">🔒</div>
@@ -487,9 +504,9 @@ function init(){
             กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
           </div>
           <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${msg}</div>
-          <button onclick="location.reload()"
+          <button onclick="liff.login()"
             style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
-            🔄 ลองใหม่
+            🔄 เข้าสู่ระบบใหม่
           </button>
         </div>`;
     });

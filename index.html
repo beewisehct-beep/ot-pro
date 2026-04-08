@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Oh my เวร - Pro</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -460,44 +460,22 @@ const WORK=[
 ];
 const SUCCESS=["น้องเวรภูมิใจในคุณมากค่ะ! 🔥","OT ทุกชั่วโมงมีค่านะคะ 💰","สู้ตลอดเลยค่ะ เก่งมากเลย! ⚡","ทุกเวรที่จด = เงินที่ได้จริงค่ะ 💸","ยอดมากเลยค่ะ เงินในกระเป๋าแน่นขึ้นแล้ว! ✨"];
 
-function showLoadingError(msg) {
-  document.getElementById("loadingScreen").innerHTML = `
-    <div style="text-align:center;padding:40px 24px;">
-      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
-      <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">โหลดไม่สำเร็จ</div>
-      <div style="font-size:13px;color:#546E7A;line-height:1.6;">${msg}</div>
-      <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">กรุณาปิดแล้วเปิดใหม่ผ่าน LINE ค่ะ</div>
-      <button onclick="location.reload()"
-        style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
-        🔄 ลองใหม่
-      </button>
-    </div>`;
-}
-
 function init(){
   updateClock(); setInterval(updateClock, 1000); setDefaultDate(); setSpeech(IDLE);
   sumMonth = new Date();
   curYear = new Date().getFullYear();
   makeDraggable(document.getElementById("mascotWrap"));
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("LIFF timeout — กรุณาเปิดผ่าน LINE ค่ะ")), 12000)
-  );
-
-  Promise.race([
-    liff.init({ liffId: "2009520328-4YznojXl" }),
-    timeout
-  ])
+  liff.init({ liffId: "2009520328-4YznojXl" })
     .then(() => {
       if (liff.isInClient()) {
         return liff.getProfile();
-      } else {
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
-        return liff.getProfile();
       }
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return Promise.resolve(null);
+      }
+      return liff.getProfile();
     })
     .then(profile => {
       if (!profile) return;
@@ -509,7 +487,20 @@ function init(){
       showApp();
     })
     .catch(err => {
-      showLoadingError(err.message || "เกิดข้อผิดพลาดค่ะ");
+      document.getElementById("loadingScreen").innerHTML = `
+        <div style="text-align:center;padding:40px 24px;">
+          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
+          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
+            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
+            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
+          </div>
+          <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${err.message||""}</div>
+          <button onclick="location.reload()"
+            style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
+            🔄 ลองใหม่
+          </button>
+        </div>`;
     });
 }
 function showApp(){

@@ -466,19 +466,8 @@ function init(){
   curYear = new Date().getFullYear();
   makeDraggable(document.getElementById("mascotWrap"));
 
-  liff.init({
-      liffId: "2009520328-4YznojXl",
-      withLoginOnExternalBrowser: true
-    })
-    .then(() => {
-      // ใน LINE app → isInClient() = true → getProfile ได้เลย
-      // นอก LINE → withLoginOnExternalBrowser จะ redirect login อัตโนมัติ
-      if (!liff.isLoggedIn() && !liff.isInClient()) {
-        liff.login();
-        return Promise.resolve(null);
-      }
-      return liff.getProfile();
-    })
+  liff.init({ liffId: "2009520328-4YznojXl" })
+    .then(() => liff.getProfile())
     .then(profile => {
       if (!profile) return;
       uid = profile.userId;
@@ -490,17 +479,11 @@ function init(){
     })
     .catch(err => {
       const msg = err.message || JSON.stringify(err) || "";
-      // token หมดอายุ → login ใหม่อัตโนมัติ
-      if (msg.includes("expired") || msg.includes("token") || msg.includes("401")) {
-        liff.login();
-        return;
-      }
       document.getElementById("loadingScreen").innerHTML = `
         <div style="text-align:center;padding:40px 24px;">
           <div style="font-size:48px;margin-bottom:16px;">🔒</div>
           <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
           <div style="font-size:13px;color:#546E7A;line-height:1.6;">
-            Oh my เวร Pro ต้องเปิดผ่าน LINE เท่านั้นค่ะ<br>
             กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
           </div>
           <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${msg}</div>

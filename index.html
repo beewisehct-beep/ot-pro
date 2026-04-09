@@ -393,7 +393,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
         <div class="card-title">💰 เรทค่าแรงเวร OT</div>
         <div class="rate-row">
           <div><div class="rate-lbl">บาท / ชั่วโมง</div><div class="rate-val" id="rateDisp">—</div></div>
-          <button class="btn-edit-sm" onclick="toggleEdit()">แก้ไข</button>
+          <button class="btn-edit-sm" onclick="toggleRateEdit()">แก้ไข</button>
         </div>
         <div id="editForm" style="display:none">
           <div class="fg"><label>เรทใหม่ (บาท/ชม.)</label><input type="number" id="newRate" placeholder="เช่น 150" min="1"></div>
@@ -713,8 +713,11 @@ function changeMonth(d){sumMonth.setMonth(sumMonth.getMonth()+d);if(uid)loadSumm
 
 function initPDF(title) {
   try {
+    if (!window.jspdf || !window.jspdf.jsPDF) { 
+      alert("❌ กรุณารอสักครู่แล้วลองใหม่ค่ะ (PDF กำลังโหลด)"); 
+      return null; 
+    }
     const { jsPDF } = window.jspdf;
-    if (!jsPDF) { alert("❌ โหลด jsPDF ไม่ได้ค่ะ"); return null; }
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     doc.setFont("helvetica");
     doc.setFontSize(16);
@@ -856,7 +859,7 @@ async function loadRate(){
     if(data.result){rate=data.result;document.getElementById("rateDisp").textContent=rate.toLocaleString()+" ฿/ชม.";document.getElementById("newRate").value=rate;}
   }catch(e){}
 }
-function toggleEdit(){const f=document.getElementById("editForm");f.style.display=f.style.display==="none"?"block":"none";}
+function toggleRateEdit(){const f=document.getElementById("editForm");f.style.display=f.style.display==="none"?"block":"none";}
 async function saveRate(){
   const rv=parseFloat(document.getElementById("newRate").value);if(isNaN(rv)||rv<=0)return;
   try{

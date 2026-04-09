@@ -727,11 +727,59 @@ function changeMonth(d){sumMonth.setMonth(sumMonth.getMonth()+d);if(uid)loadSumm
 
 function dlCSV(csvContent, filename) {
   const bom = "\uFEFF";
-  const blob = new Blob([bom + csvContent], {type: "text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  // ลอง download ปกติก่อน (browser บนคอม)
+  try {
+    const blob = new Blob([bom + csvContent], {type: "text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {}
+  
+  // แสดง modal ให้ copy (สำหรับ LINE browser)
+  showCSVModal(csvContent, filename);
+}
+
+function showCSVModal(csvContent, filename) {
+  // ลบ modal เดิมถ้ามี
+  const old = document.getElementById("csvModal");
+  if (old) old.remove();
+  
+  const modal = document.createElement("div");
+  modal.id = "csvModal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px;";
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:20px;width:100%;max-width:400px;max-height:80vh;overflow:auto;">
+      <div style="font-size:15px;font-weight:800;color:#00838F;margin-bottom:4px;">📊 ${filename}</div>
+      <div style="font-size:11px;color:#546E7A;margin-bottom:12px;">กด "คัดลอก" แล้วนำไปวางใน Excel หรือ Google Sheets ได้เลยค่ะ</div>
+      <textarea id="csvText" readonly style="width:100%;height:180px;font-size:11px;font-family:monospace;border:1.5px solid #B2EBF2;border-radius:10px;padding:8px;resize:none;">${csvContent}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+        <button onclick="copyCsvText()" style="background:#00838F;color:#fff;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
+          📋 คัดลอก
+        </button>
+        <button onclick="document.getElementById('csvModal').remove()" style="background:#E0F7FA;color:#00838F;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;">
+          ปิด
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function copyCsvText() {
+  const text = document.getElementById("csvText").value;
+  try {
+    await navigator.clipboard.writeText(text);
+    alert("คัดลอกแล้วค่ะ! 📋\nนำไปวางใน Excel หรือ Google Sheets ได้เลยค่ะ");
+  } catch(e) {
+    // fallback: select all
+    const ta = document.getElementById("csvText");
+    ta.select();
+    document.execCommand("copy");
+    alert("คัดลอกแล้วค่ะ! 📋");
+  }
 }
 
 function exportMonthCSV() {

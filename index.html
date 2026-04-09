@@ -437,7 +437,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
 </div>
 
 <script>
-const GAS="https://script.google.com/macros/s/AKfycbwnvNHqod0iw2m3OTrObmJs1fvuZa3j7FxwTy2qHi6B7X1Ig1QafdyL17V8vvSijH-NNw/exec";
+const GAS="https://script.google.com/macros/s/AKfycbwoECwj3lbfMeBk-QSWOSiEjD7DGydN5UyIbylnvh5XOEwlA9aI_mMl0bJ2h2Jgi-u2hA/exec";
 let uid=null,uname=null,rate=0,cinTime=null;
 let sumMonth=new Date(2026,2,1); // March 2026 as default
 let editingIdx=null,currentRecs=[];
@@ -481,6 +481,10 @@ function init(){
       document.getElementById("profName").textContent = uname;
       document.getElementById("settingName").textContent = uname;
       document.getElementById("nameInput").value = uname;
+      // บันทึก user เข้า Sheet + link rich menu
+      fetch(GAS, {method:"POST", body:JSON.stringify({
+        action:"saveUser", userId:uid, name:uname, rate:0
+      })});
       showApp();
     })
     .catch(err => {
@@ -507,13 +511,13 @@ function init(){
         </div>`;
     });
 }
-async function showApp(){
+function showApp(){
   document.getElementById("loadingScreen").classList.add("hide");
   document.getElementById("appContainer").style.display="";
   const sv=localStorage.getItem("ot_cin");
   if(sv){cinTime=new Date(sv);setWorking(true);setSpeech(WORK);document.getElementById("zzzSpan").style.display="none";}
-  await loadRate(); // รอ rate โหลดเสร็จก่อน
-  loadSummary();
+  loadRate();
+  loadSummary(); // ✅ เพิ่มบรรทัดนี้
 }
 
 function openNameModal(){document.getElementById("nameInput").value=uname||"";document.getElementById("nameModal").classList.add("show");}
@@ -615,9 +619,7 @@ async function loadSummary(){
     const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getDetail",userId:uid,year:y,month:mo})});
     const data=await r.json();
     currentRecs=data.records||[];renderSummary(currentRecs);
-  }catch(e){
-    document.getElementById("recList").innerHTML='<div class="loading-box">❌ '+e.message+'</div>';
-  }
+  }catch(e){document.getElementById("recList").innerHTML='<div class="loading-box">❌ โหลดไม่ได้ ลองใหม่นะคะ</div>';}
 }
 
 function renderSummary(recs){

@@ -481,10 +481,6 @@ function init(){
       document.getElementById("profName").textContent = uname;
       document.getElementById("settingName").textContent = uname;
       document.getElementById("nameInput").value = uname;
-      // บันทึก user เข้า Sheet + link rich menu (ไม่ส่ง rate เพื่อไม่ทับค่าเดิม)
-      fetch(GAS, {method:"POST", body:JSON.stringify({
-        action:"saveUser", userId:uid, name:uname, rate:0
-      })}).catch(()=>{});
       showApp();
     })
     .catch(err => {
@@ -511,12 +507,13 @@ function init(){
         </div>`;
     });
 }
-function showApp(){
+async function showApp(){
   document.getElementById("loadingScreen").classList.add("hide");
   document.getElementById("appContainer").style.display="";
   const sv=localStorage.getItem("ot_cin");
   if(sv){cinTime=new Date(sv);setWorking(true);setSpeech(WORK);document.getElementById("zzzSpan").style.display="none";}
-  loadRate().then(() => loadSummary()); // โหลด rate ก่อน แล้วค่อย load summary
+  await loadRate(); // รอ rate โหลดเสร็จก่อน
+  loadSummary();
 }
 
 function openNameModal(){document.getElementById("nameInput").value=uname||"";document.getElementById("nameModal").classList.add("show");}
@@ -618,7 +615,9 @@ async function loadSummary(){
     const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getDetail",userId:uid,year:y,month:mo})});
     const data=await r.json();
     currentRecs=data.records||[];renderSummary(currentRecs);
-  }catch(e){document.getElementById("recList").innerHTML='<div class="loading-box">❌ โหลดไม่ได้ ลองใหม่นะคะ</div>';}
+  }catch(e){
+    document.getElementById("recList").innerHTML='<div class="loading-box">❌ '+e.message+'</div>';
+  }
 }
 
 function renderSummary(recs){
@@ -852,11 +851,7 @@ async function loadRate(){
   try{
     const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getRate",userId:uid})});
     const data=await r.json();
-    if(data.result && data.result > 0){
-      rate=data.result;
-      document.getElementById("rateDisp").textContent=rate.toLocaleString()+" ฿/ชม.";
-      document.getElementById("newRate").value=rate;
-    }
+    if(data.result){rate=data.result;document.getElementById("rateDisp").textContent=rate.toLocaleString()+" ฿/ชม.";document.getElementById("newRate").value=rate;}
   }catch(e){}
 }
 function toggleEdit(){const f=document.getElementById("editForm");f.style.display=f.style.display==="none"?"block":"none";}

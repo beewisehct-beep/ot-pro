@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Oh my เวร - Pro</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -631,7 +633,16 @@ function renderSummary(recs){
   if(!recs.length){document.getElementById("recList").innerHTML='<div class="loading-box">📭 ยังไม่มีข้อมูลเดือนนี้ค่ะ</div>';return;}
   document.getElementById("recList").innerHTML=recs.map((r,i)=>{
     const d=r.date||"—",st=r.startTime||"",en=r.endTime||"";
-    const timeStr=st&&en?st+" – "+en:"";
+    // format เวลาให้อ่านง่าย
+    const fmtTime=(t)=>{
+      if(!t)return"";
+      // ถ้าเป็น ISO หรือ timestamp ให้แปลง
+      if(t.includes("T")||t.length>8){
+        try{const dt=new Date(t);return p(dt.getHours())+":"+p(dt.getMinutes());}catch(e){}
+      }
+      return t;
+    };
+    const timeStr=st&&en?fmtTime(st)+" – "+fmtTime(en):"";
     const hrs=parseFloat(r.hours)||0,money=parseFloat(r.money)||Math.round(hrs*rate);
     const parts=d.split("/");
     const inputDate=parts.length===3?parts[2]+"-"+parts[1].padStart(2,"0")+"-"+parts[0].padStart(2,"0"):"";
@@ -682,16 +693,21 @@ async function saveEdit(i){
   const newDate=parseInt(d)+"/"+parseInt(m)+"/"+parseInt(y);
   const newMoney=Math.round(newHrs*rate);
   try{
-    const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"editOT",userId:uid,oldDate:rec.date,newDate,hours:newHrs,startTime:rec.startTime||"",endTime:rec.endTime||""})});
-    const data=await r.json();
-    if(data.result==="ok"){
-      currentRecs[i].date=newDate;
-      currentRecs[i].hours=newHrs;
-      currentRecs[i].money=newMoney;
-      renderSummary(currentRecs);
-      showOv("","","แก้ไขเรียบร้อยแล้วค่ะ ✅");
-    } else alert("แก้ไขไม่สำเร็จค่ะ");
-  }catch(e){alert("เกิดข้อผิดพลาดค่ะ");}
+    // ลบ record เดิม แล้วสร้างใหม่ (แก้ทั้งวันที่และชั่วโมงได้)
+    const del=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"deleteOT",userId:uid,date:rec.date,hours:rec.hours})});
+    const delData=await del.json();
+    if(delData.result==="ok"||delData.result==="not_found"){
+      const save=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"saveOT",userId:uid,date:newDate,hours:newHrs,startTime:rec.startTime||"",endTime:rec.endTime||""})});
+      const saveData=await save.json();
+      if(saveData.result==="ok"||saveData.money>=0){
+        currentRecs[i].date=newDate;
+        currentRecs[i].hours=newHrs;
+        currentRecs[i].money=newMoney;
+        renderSummary(currentRecs);
+        showOv("","","แก้ไขเรียบร้อยแล้วค่ะ ✅");
+      } else alert("บันทึกใหม่ไม่สำเร็จค่ะ: "+JSON.stringify(saveData));
+    } else alert("ลบไม่สำเร็จค่ะ: "+JSON.stringify(delData));
+  }catch(e){alert("เกิดข้อผิดพลาดค่ะ: "+e.message);}
 }
 
 async function confirmDelete(i){
@@ -947,7 +963,5 @@ function makeDraggable(el){
 }
 init();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>

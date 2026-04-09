@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>Oh my เวร - Pro</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -360,8 +358,8 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           <div class="total-box t3"><div class="total-val" id="sumMoney">—</div><div class="total-lbl">บาท</div></div>
         </div>
         <div class="btn-export-row">
-          <button class="btn-exp" onclick="exportMonthPDF()">⬇️ PDF เดือนนี้</button>
-          <button class="btn-exp-acc" id="btnCumulative" onclick="exportCumulativePDF()">📋 PDF รวมทั้งหมด</button>
+          <button class="btn-exp" onclick="exportMonthCSV()">⬇️ CSV เดือนนี้</button>
+          <button class="btn-exp-acc" id="btnCumulative" onclick="exportCumulativeCSV()">📋 CSV รวมทั้งหมด</button>
         </div>
         <div class="rec-list" id="recList"><div class="loading-box">⏳ กำลังโหลด...</div></div>
       </div>
@@ -381,7 +379,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
         <div class="months-grid" id="monthsGrid">
           <div class="yearly-loading" style="grid-column:1/-1">⏳ กำลังโหลด...</div>
         </div>
-        <button class="btn-yearly-export" onclick="exportYearPDF()">⬇️ Export PDF ทั้งปี</button>
+        <button class="btn-yearly-export" onclick="exportYearCSV()">⬇️ Export CSV ทั้งปี</button>
         <button class="btn-line-share" onclick="shareToLine()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
           ส่งสรุปปีไป LINE
@@ -727,146 +725,81 @@ async function confirmDelete(i){
 
 function changeMonth(d){sumMonth.setMonth(sumMonth.getMonth()+d);if(uid)loadSummary();}
 
-function initPDF(title) {
-  try {
-    if (!window.jspdf || !window.jspdf.jsPDF) { 
-      alert("❌ กรุณารอสักครู่แล้วลองใหม่ค่ะ (PDF กำลังโหลด)"); 
-      return null; 
-    }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("helvetica");
-    doc.setFontSize(16);
-    doc.setTextColor(0, 131, 143);
-    doc.text(title, 14, 18);
-    doc.setFontSize(9);
-    doc.setTextColor(120, 120, 120);
-    doc.text("Oh my Wern Pro  |  " + new Date().toLocaleDateString("th-TH"), 14, 25);
-    doc.setDrawColor(0, 131, 143);
-    doc.setLineWidth(0.5);
-    doc.line(14, 27, 196, 27);
-    return doc;
-  } catch(e) {
-    alert("❌ PDF Error: " + e.message);
-    return null;
-  }
+function dlCSV(csvContent, filename) {
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csvContent], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
-function exportMonthPDF() {
+function exportMonthCSV() {
   if (!currentRecs.length) { alert("ไม่มีข้อมูลค่ะ"); return; }
-  const mo = sumMonth.getMonth() + 1, y = sumMonth.getFullYear();
-  const doc = initPDF("OT Month " + mo + "/" + y);
-  if (!doc) return;
-  const rows = currentRecs.map(r => {
-    const hrs = parseFloat(r.hours) || 0;
-    const money = parseFloat(r.money) || Math.round(hrs * rate);
-    return [r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()];
+  const mo = sumMonth.getMonth()+1, y = sumMonth.getFullYear();
+  let rows = ["วันที่,ชั่วโมง,เวลาเข้า,เวลาออก,รายได้(บาท)"];
+  let totH=0, totM=0;
+  currentRecs.forEach(r => {
+    const hrs = parseFloat(r.hours)||0;
+    const money = parseFloat(r.money)||Math.round(hrs*rate);
+    rows.push(`${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
+    totH+=hrs; totM+=money;
   });
-  const totHrs = currentRecs.reduce((a, r) => a + (parseFloat(r.hours) || 0), 0);
-  const totMoney = currentRecs.reduce((a, r) => a + (parseFloat(r.money) || Math.round((parseFloat(r.hours) || 0) * rate)), 0);
-  rows.push(["Total", totHrs.toFixed(1), "", "", Math.round(totMoney).toLocaleString()]);
-  try {
-    doc.autoTable({
-      startY: 32,
-      head: [["Date", "Hours", "Start", "End", "Income (B)"]],
-      body: rows,
-      styles: { fontSize: 10, halign: "center", font: "helvetica" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
-      didParseCell(data) {
-        if (data.row.index === rows.length - 1) {
-          data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [224, 247, 250];
-        }
-      }
-    });
-    doc.save("OT_" + mo + "_" + y + ".pdf");
-  } catch(e) { alert("❌ PDF Error: " + e.message); }
+  rows.push(`รวม,${totH.toFixed(1)},,,${Math.round(totM)}`);
+  dlCSV(rows.join("\n"), `OT_${TH_MONTHS[mo-1]}_${y}.csv`);
 }
 
-async function exportCumulativePDF() {
+async function exportCumulativeCSV() {
   const btn = document.getElementById("btnCumulative");
-  btn.textContent = "⏳ Loading..."; btn.disabled = true;
+  btn.textContent = "⏳ กำลังโหลด..."; btn.disabled = true;
   try {
-    const now = new Date(), endY = now.getFullYear(), endM = now.getMonth() + 1;
-    const fetches = [];
-    let cy = endY, cm = endM;
-    for (let i = 0; i < 24; i++) {
-      fetches.push({ y: cy, m: cm });
-      cm--; if (cm < 1) { cm = 12; cy--; }
+    const now = new Date(), endY=now.getFullYear(), endM=now.getMonth()+1;
+    const fetches=[];
+    let cy=endY, cm=endM;
+    for(let i=0;i<24;i++){
+      fetches.push({y:cy,m:cm});
+      cm--; if(cm<1){cm=12;cy--;}
     }
-    const results = await Promise.all(fetches.map(({ y, m }) =>
-      fetch(GAS, { method: "POST", body: JSON.stringify({ action: "getDetail", userId: uid, year: y, month: m }) })
-        .then(r => r.json()).then(d => ({ y, m, records: d.records || [] })).catch(() => ({ y, m, records: [] }))
+    const results = await Promise.all(fetches.map(({y,m})=>
+      fetch(GAS,{method:"POST",body:JSON.stringify({action:"getDetail",userId:uid,year:y,month:m})})
+        .then(r=>r.json()).then(d=>({y,m,records:d.records||[]})).catch(()=>({y,m,records:[]}))
     ));
-    results.sort((a, b) => a.y !== b.y ? a.y - b.y : a.m - b.m);
-    const doc = initPDF("OT All Records");
-    if (!doc) return;
-    const rows = [];
-    let gH = 0, gM = 0, gC = 0;
-    results.forEach(({ y, m, records }) => {
-      if (!records.length) return;
-      records.forEach(r => {
-        const hrs = parseFloat(r.hours) || 0;
-        const money = parseFloat(r.money) || Math.round(hrs * rate);
-        rows.push([m + "/" + y, r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
-        gH += hrs; gM += money; gC++;
+    results.sort((a,b)=>a.y!==b.y?a.y-b.y:a.m-b.m);
+    let rows=["เดือน,วันที่,ชั่วโมง,เวลาเข้า,เวลาออก,รายได้(บาท)"];
+    let gH=0,gM=0,gC=0;
+    results.forEach(({y,m,records})=>{
+      if(!records.length)return;
+      records.forEach(r=>{
+        const hrs=parseFloat(r.hours)||0;
+        const money=parseFloat(r.money)||Math.round(hrs*rate);
+        rows.push(`${TH_MONTHS[m-1]} ${y},${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
+        gH+=hrs; gM+=money; gC++;
       });
     });
-    if (!rows.length) { alert("ไม่มีข้อมูลเลยค่ะ"); return; }
-    rows.push(["Total (" + gC + ")", "", gH.toFixed(1), "", "", Math.round(gM).toLocaleString()]);
-    doc.autoTable({
-      startY: 32,
-      head: [["Month", "Date", "Hours", "Start", "End", "Income (B)"]],
-      body: rows,
-      styles: { fontSize: 9, halign: "center", font: "helvetica" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
-      didParseCell(data) {
-        if (data.row.index === rows.length - 1) {
-          data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [224, 247, 250];
-        }
-      }
-    });
-    doc.save("OT_All_" + endM + "_" + endY + ".pdf");
-  } catch (e) { alert("❌ PDF Error: " + e.message); }
-  finally { btn.textContent = "📋 PDF รวมทั้งหมด"; btn.disabled = false; }
+    rows.push(`รวม(${gC}ครั้ง),,${gH.toFixed(1)},,,${Math.round(gM)}`);
+    dlCSV(rows.join("\n"), `OT_รวมถึง_${TH_MONTHS[endM-1]}_${endY}.csv`);
+  } catch(e){ alert("เกิดข้อผิดพลาดค่ะ"); }
+  finally { btn.textContent="📋 CSV รวมทั้งหมด"; btn.disabled=false; }
 }
 
-function exportYearPDF() {
+function exportYearCSV() {
   const data = yearlyData[curYear];
   if (!data) { alert("กรุณารอโหลดข้อมูลก่อนค่ะ"); return; }
-  const doc = initPDF("OT Year " + curYear);
-  if (!doc) return;
-  const rows = [];
+  let rows = ["เดือน,วันที่,ชั่วโมง,เวลาเข้า,เวลาออก,รายได้(บาท)"];
   data.forEach(m => {
     m.records.forEach(r => {
-      const hrs = parseFloat(r.hours) || 0;
-      const money = parseFloat(r.money) || Math.round(hrs * rate);
-      rows.push([m.month + "/" + curYear, r.date, hrs.toFixed(1), r.startTime || "-", r.endTime || "-", money.toLocaleString()]);
+      const hrs=parseFloat(r.hours)||0;
+      const money=parseFloat(r.money)||Math.round(hrs*rate);
+      rows.push(`${TH_MONTHS[m.month-1]},${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
     });
   });
-  if (!rows.length) { alert("ไม่มีข้อมูลปีนี้ค่ะ"); return; }
-  const totH = data.reduce((a, m) => a + m.hours, 0);
-  const totM = data.reduce((a, m) => a + m.money, 0);
-  const totC = data.reduce((a, m) => a + m.count, 0);
-  rows.push(["Total (" + totC + ")", "", totH.toFixed(1), "", "", Math.round(totM).toLocaleString()]);
-  try {
-    doc.autoTable({
-      startY: 32,
-      head: [["Month", "Date", "Hours", "Start", "End", "Income (B)"]],
-      body: rows,
-      styles: { fontSize: 9, halign: "center", font: "helvetica" },
-      headStyles: { fillColor: [0, 131, 143], textColor: 255, font: "helvetica" },
-      didParseCell(data) {
-        if (data.row.index === rows.length - 1) {
-          data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [224, 247, 250];
-        }
-      }
-    });
-    doc.save("OT_Year_" + curYear + ".pdf");
-  } catch(e) { alert("❌ PDF Error: " + e.message); }
+  const totH=data.reduce((a,m)=>a+m.hours,0);
+  const totM=data.reduce((a,m)=>a+m.money,0);
+  const totC=data.reduce((a,m)=>a+m.count,0);
+  rows.push(`รวม(${totC}ครั้ง),,${totH.toFixed(1)},,,${Math.round(totM)}`);
+  dlCSV(rows.join("\n"), `OT_ปี_${curYear}.csv`);
 }
+
 
 async function loadRate(){
   try{

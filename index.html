@@ -631,13 +631,18 @@ function renderSummary(recs){
   if(!recs.length){document.getElementById("recList").innerHTML='<div class="loading-box">📭 ยังไม่มีข้อมูลเดือนนี้ค่ะ</div>';return;}
   document.getElementById("recList").innerHTML=recs.map((r,i)=>{
     const d=r.date||"—",st=r.startTime||"",en=r.endTime||"";
-    // format เวลาให้อ่านง่าย
+    // แปลงเวลาจาก ISO หรือ HH:MM ให้อ่านง่าย
     const fmtTime=(t)=>{
-      if(!t)return"";
-      // ถ้าเป็น ISO หรือ timestamp ให้แปลง
-      if(t.includes("T")||t.length>8){
-        try{const dt=new Date(t);return p(dt.getHours())+":"+p(dt.getMinutes());}catch(e){}
-      }
+      if(!t||t==="")return"";
+      try{
+        if(t.includes("T")){
+          // ISO format เช่น 1899-12-30T07:59:56.000Z
+          // ใช้ UTC time เพราะ Google Sheets เก็บแบบ UTC
+          const dt=new Date(t);
+          const h=dt.getUTCHours(), m=dt.getUTCMinutes();
+          return p(h)+":"+p(m);
+        }
+      }catch(e){}
       return t;
     };
     const timeStr=st&&en?fmtTime(st)+" – "+fmtTime(en):"";
@@ -725,6 +730,17 @@ async function confirmDelete(i){
 
 function changeMonth(d){sumMonth.setMonth(sumMonth.getMonth()+d);if(uid)loadSummary();}
 
+function fmtT(t){
+  if(!t||t==="")return"";
+  try{
+    if(t.includes("T")){
+      const dt=new Date(t);
+      return p(dt.getUTCHours())+":"+p(dt.getUTCMinutes());
+    }
+  }catch(e){}
+  return t;
+}
+
 function dlCSV(csvContent, filename) {
   const bom = "\uFEFF";
   // ลอง download ปกติก่อน (browser บนคอม)
@@ -790,7 +806,7 @@ function exportMonthCSV() {
   currentRecs.forEach(r => {
     const hrs = parseFloat(r.hours)||0;
     const money = parseFloat(r.money)||Math.round(hrs*rate);
-    rows.push(`${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
+    rows.push(`${r.date},${hrs},${fmtT(r.startTime)},${fmtT(r.endTime)},${money}`);
     totH+=hrs; totM+=money;
   });
   rows.push(`รวม,${totH.toFixed(1)},,,${Math.round(totM)}`);
@@ -820,7 +836,7 @@ async function exportCumulativeCSV() {
       records.forEach(r=>{
         const hrs=parseFloat(r.hours)||0;
         const money=parseFloat(r.money)||Math.round(hrs*rate);
-        rows.push(`${TH_MONTHS[m-1]} ${y},${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
+        rows.push(`${TH_MONTHS[m-1]} ${y},${r.date},${hrs},${fmtT(r.startTime)},${fmtT(r.endTime)},${money}`);
         gH+=hrs; gM+=money; gC++;
       });
     });
@@ -838,7 +854,7 @@ function exportYearCSV() {
     m.records.forEach(r => {
       const hrs=parseFloat(r.hours)||0;
       const money=parseFloat(r.money)||Math.round(hrs*rate);
-      rows.push(`${TH_MONTHS[m.month-1]},${r.date},${hrs},${r.startTime||""},${r.endTime||""},${money}`);
+      rows.push(`${TH_MONTHS[m.month-1]},${r.date},${hrs},${fmtT(r.startTime)},${fmtT(r.endTime)},${money}`);
     });
   });
   const totH=data.reduce((a,m)=>a+m.hours,0);

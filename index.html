@@ -392,10 +392,16 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
     <div id="tab-import" class="tab-content">
       <div class="card">
         <div class="card-title">📋 นำเข้าตารางเวร</div>
-        <p style="font-size:12px;color:var(--text-l);margin-bottom:12px;line-height:1.7;">วางข้อความตารางเวรได้เลยค่ะ เช่น<br><em>"1/4/2569 เวรบ่าย C, 2/4/2569 เวรดึก"</em></p>
+        <p style="font-size:12px;color:var(--text-l);margin-bottom:12px;line-height:1.7;">
+  วางข้อความตารางเวรได้เลยค่ะ ใช้ชื่อเวรเหมือนในตั้งค่า เช่น<br>
+  <em>"1/4/2026 เวรบ่าย"</em> หรือ <em>"2/4/2026 เวรดึก"</em>
+</p>
         <div class="fg">
           <label>📝 วางข้อความตารางเวร</label>
-          <textarea id="importText" rows="8" style="width:100%;padding:11px 13px;border:1.5px solid #D0EEF2;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:13px;color:var(--text);resize:vertical;" placeholder="เช่น&#10;1/4/2569 เวรบ่าย C&#10;2/4/2569 เวรคลินิกพี่ (เช้า, เย็น)&#10;3/4/2569 เวรดึก"></textarea>
+          <div style="font-size:11px;color:#7B1FA2;margin-bottom:6px;font-weight:600;">
+            💡 พูดได้เลย: กดไอคอน 🎤 บนแป้นพิมพ์มือถือ → พูด เช่น "1 ทับ 4 ทับ 2026 เวรบ่าย" → ข้อความจะปรากฏที่นี่ค่ะ
+          </div>
+          <textarea id="importText" rows="8" style="width:100%;padding:11px 13px;border:1.5px solid #D0EEF2;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:13px;color:var(--text);resize:vertical;" placeholder="เช่น&#10;1/4/2026 เวรบ่าย&#10;2/4/2026 เวรดึก&#10;3/4/2026 เวรคลินิก (เช้า)&#10;4/4/2026 เวรเช้า + เวรคลินิก (เย็น)"></textarea>
         </div>
         <button class="btn-submit" onclick="parseAndPreview()" style="margin-bottom:10px;">🔍 วิเคราะห์ตาราง</button>
         <div id="importError" class="err"></div>
@@ -405,21 +411,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           <button class="btn-submit" onclick="batchSaveOT()" id="btnBatchSave">💾 บันทึกทั้งหมด</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">🎤 พูดบันทึกผ่านแป้นพิมพ์</div>
-        <p style="font-size:12px;color:var(--text-l);margin-bottom:10px;line-height:1.7;">
-          กดไอคอน 🎤 บนแป้นพิมพ์มือถือ แล้วพูด เช่น<br>
-          <em>"1/4/2569 เวรบ่าย"</em> แล้วกดปุ่มเพิ่มค่ะ
-        </p>
-        <div class="fg">
-          <textarea id="voiceInput" rows="3"
-            style="width:100%;padding:11px 13px;border:1.5px solid #E1BEE7;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:14px;color:var(--text);"
-            placeholder="พูดแล้วข้อความจะมาที่นี่ค่ะ"></textarea>
-        </div>
-        <button class="btn-submit" onclick="appendVoiceText()" style="background:linear-gradient(135deg,#7B1FA2,#AB47BC);">
-          ➕ เพิ่มไปยังช่องนำเข้า
-        </button>
-      </div>
+
 
     </div>
 
@@ -1013,7 +1005,6 @@ const DEFAULT_SHIFTS = [
   { key:"clinic_m", name:"เวรคลินิก (เช้า)",  start:"08:00", end:"16:00", hours:8   },
   { key:"clinic_e", name:"เวรคลินิก (เย็น)",  start:"16:00", end:"20:00", hours:4   },
   { key:"full",     name:"เวรเช้า-บ่าย",      start:"08:00", end:"24:00", hours:16  },
-  { key:"opd",      name:"เวรเช้า OPD",        start:"08:00", end:"16:00", hours:8   },
   { key:"other",    name:"เวรอื่นๆ",           start:"08:00", end:"16:00", hours:8   },
 ];
 
@@ -1059,7 +1050,6 @@ function detectShift(text){
   if(t.includes("คลินิก")) return userShifts.find(s=>s.key==="clinic_m")||userShifts[3];
   if(t.includes("ดึก")||t.includes("night")) return userShifts.find(s=>s.key==="night")||userShifts[2];
   if(t.includes("บ่าย")||t.includes("pm")) return userShifts.find(s=>s.key==="afternoon")||userShifts[1];
-  if(t.includes("opd")) return userShifts.find(s=>s.key==="opd")||userShifts[6];
   if(t.includes("เช้า")||t.includes("am")) return userShifts.find(s=>s.key==="morning")||userShifts[0];
   return userShifts.find(s=>s.key==="other")||userShifts[7];
 }

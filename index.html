@@ -296,6 +296,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
       <button class="tab" onclick="switchTab('manual',this)"><span class="ti">✏️</span>กรอก</button>
       <button class="tab" onclick="switchTab('summary',this)"><span class="ti">📊</span>เดือน</button>
       <button class="tab" onclick="switchTab('yearly',this)"><span class="ti">📅</span>ปีนี้</button>
+      <button class="tab" onclick="switchTab('import',this)"><span class="ti">📋</span>นำเข้า</button>
       <button class="tab" onclick="switchTab('settings',this)"><span class="ti">⚙️</span>ตั้งค่า</button>
     </div>
   </div>
@@ -387,6 +388,33 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
       </div>
     </div>
     
+    <!-- นำเข้าตารางเวร -->
+    <div id="tab-import" class="tab-content">
+      <div class="card">
+        <div class="card-title">📋 นำเข้าตารางเวร</div>
+        <p style="font-size:12px;color:var(--text-l);margin-bottom:12px;line-height:1.7;">วางข้อความตารางเวรได้เลยค่ะ เช่น<br><em>"1/4/2569 เวรบ่าย C, 2/4/2569 เวรดึก"</em></p>
+        <div class="fg">
+          <label>📝 วางข้อความตารางเวร</label>
+          <textarea id="importText" rows="8" style="width:100%;padding:11px 13px;border:1.5px solid #D0EEF2;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:13px;color:var(--text);resize:vertical;" placeholder="เช่น&#10;1/4/2569 เวรบ่าย C&#10;2/4/2569 เวรคลินิกพี่ (เช้า, เย็น)&#10;3/4/2569 เวรดึก"></textarea>
+        </div>
+        <button class="btn-submit" onclick="parseAndPreview()" style="margin-bottom:10px;">🔍 วิเคราะห์ตาราง</button>
+        <div id="importError" class="err"></div>
+        <div id="importPreview" style="display:none;">
+          <div style="font-size:13px;font-weight:700;color:var(--teal-d);margin-bottom:8px;">📋 ตรวจสอบก่อนบันทึก</div>
+          <div id="previewList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;max-height:300px;overflow-y:auto;"></div>
+          <button class="btn-submit" onclick="batchSaveOT()" id="btnBatchSave">💾 บันทึกทั้งหมด</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🎤 พูดบันทึกเวร</div>
+        <p style="font-size:12px;color:var(--text-l);margin-bottom:12px;">กดปุ่มแล้วพูด เช่น "วันที่ 1 เดือน 4 เวรบ่าย"</p>
+        <button class="btn-submit" id="btnVoice" onclick="startVoice()" style="background:linear-gradient(135deg,#7B1FA2,#AB47BC);">
+          🎤 กดเพื่อพูด
+        </button>
+        <div id="voiceResult" style="margin-top:10px;font-size:13px;color:var(--text-l);"></div>
+      </div>
+    </div>
+
     <!-- ตั้งค่า -->
     <div id="tab-settings" class="tab-content">
       <div class="card">
@@ -399,6 +427,13 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           <div class="fg"><label>เรทใหม่ (บาท/ชม.)</label><input type="number" id="newRate" placeholder="เช่น 150" min="1"></div>
           <button class="btn-submit" onclick="saveRate()">💾 บันทึกเรท</button>
         </div>
+      </div>
+      <div class="card" style="border-color:#FFF3E0;">
+        <div class="card-title">⏰ ตั้งค่าชั่วโมงแต่ละเวร</div>
+        <p style="font-size:11px;color:var(--text-l);margin-bottom:12px;">ปรับได้ตามจริงของแต่ละคนค่ะ</p>
+        <div id="shiftList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button class="btn-submit" onclick="saveShiftTypes()" style="margin-top:12px;background:linear-gradient(135deg,#E65100,#FF6D00);">💾 บันทึกการตั้งค่าเวร</button>
+        <div id="shiftSaved" style="display:none;text-align:center;color:var(--teal-d);font-size:12px;margin-top:8px;">✅ บันทึกแล้วค่ะ</div>
       </div>
       <div class="card" style="border-color:var(--teal-p)">
         <div class="card-title">👤 บัญชีของฉัน</div>
@@ -958,6 +993,264 @@ function makeDraggable(el){
   window.addEventListener("mousemove",move);window.addEventListener("touchmove",move,{passive:false});
   window.addEventListener("mouseup",end);window.addEventListener("touchend",end);
 }
+
+// ============================================================
+// SHIFT TYPES - default + user configurable
+// ============================================================
+const DEFAULT_SHIFTS = [
+  { key:"morning",  name:"เวรเช้า",           start:"08:00", end:"16:00", hours:8   },
+  { key:"afternoon",name:"เวรบ่าย",           start:"16:00", end:"24:00", hours:8   },
+  { key:"night",    name:"เวรดึก",            start:"00:00", end:"08:00", hours:8   },
+  { key:"clinic_m", name:"เวรคลินิก (เช้า)",  start:"08:00", end:"16:00", hours:8   },
+  { key:"clinic_e", name:"เวรคลินิก (เย็น)",  start:"16:00", end:"20:00", hours:4   },
+  { key:"full",     name:"เวรเช้า-บ่าย",      start:"08:00", end:"24:00", hours:16  },
+  { key:"opd",      name:"เวรเช้า OPD",        start:"08:00", end:"16:00", hours:8   },
+  { key:"other",    name:"เวรอื่นๆ",           start:"08:00", end:"16:00", hours:8   },
+];
+
+let userShifts = JSON.parse(localStorage.getItem("ot_shifts")||"null") || DEFAULT_SHIFTS;
+
+function renderShiftSettings(){
+  const list = document.getElementById("shiftList");
+  if(!list) return;
+  list.innerHTML = userShifts.map((s,i)=>`
+    <div style="background:#FFF8E1;border-radius:12px;padding:10px 12px;">
+      <div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:6px;">${s.name}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <div><label style="font-size:10px;color:var(--text-l);">เริ่ม</label>
+          <input type="time" value="${s.start}" id="sh_start_${i}" style="width:100%;padding:6px;border:1.5px solid #FFE0B2;border-radius:8px;font-size:12px;"></div>
+        <div><label style="font-size:10px;color:var(--text-l);">สิ้นสุด</label>
+          <input type="time" value="${s.end}" id="sh_end_${i}" style="width:100%;padding:6px;border:1.5px solid #FFE0B2;border-radius:8px;font-size:12px;"></div>
+        <div><label style="font-size:10px;color:var(--text-l);">ชั่วโมง</label>
+          <input type="number" value="${s.hours}" id="sh_hrs_${i}" step="0.5" min="0.5" max="24" style="width:100%;padding:6px;border:1.5px solid #FFE0B2;border-radius:8px;font-size:12px;"></div>
+      </div>
+    </div>`).join("");
+}
+
+function saveShiftTypes(){
+  userShifts = userShifts.map((s,i)=>({
+    ...s,
+    start: document.getElementById(`sh_start_${i}`).value || s.start,
+    end:   document.getElementById(`sh_end_${i}`).value   || s.end,
+    hours: parseFloat(document.getElementById(`sh_hrs_${i}`).value) || s.hours,
+  }));
+  localStorage.setItem("ot_shifts", JSON.stringify(userShifts));
+  const msg = document.getElementById("shiftSaved");
+  msg.style.display="block";
+  setTimeout(()=>msg.style.display="none", 2000);
+}
+
+// ============================================================
+// PARSE SCHEDULE TEXT
+// ============================================================
+function detectShift(text){
+  const t = text.toLowerCase();
+  if(t.includes("เช้า-บ่าย")||t.includes("เช้าบ่าย")||t.includes("hema")||t.includes("chem")) return userShifts.find(s=>s.key==="full")||userShifts[5];
+  if(t.includes("คลินิก")&&(t.includes("เย็น")||t.includes("eve"))) return userShifts.find(s=>s.key==="clinic_e")||userShifts[4];
+  if(t.includes("คลินิก")) return userShifts.find(s=>s.key==="clinic_m")||userShifts[3];
+  if(t.includes("ดึก")||t.includes("night")) return userShifts.find(s=>s.key==="night")||userShifts[2];
+  if(t.includes("บ่าย")||t.includes("pm")) return userShifts.find(s=>s.key==="afternoon")||userShifts[1];
+  if(t.includes("opd")) return userShifts.find(s=>s.key==="opd")||userShifts[6];
+  if(t.includes("เช้า")||t.includes("am")) return userShifts.find(s=>s.key==="morning")||userShifts[0];
+  return userShifts.find(s=>s.key==="other")||userShifts[7];
+}
+
+function thaiDateToISO(dateStr){
+  // รองรับ ว/ด/ปปปป (พ.ศ. หรือ ค.ศ.)
+  const parts = dateStr.trim().split("/");
+  if(parts.length!==3) return null;
+  let [d,m,y] = parts.map(Number);
+  if(y > 2400) y = y - 543; // แปลง พ.ศ. → ค.ศ.
+  return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+
+function parseScheduleText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(l=>l);
+  const entries = [];
+  
+  for(const line of lines){
+    // หาวันที่ในรูปแบบ ว/ด/ปป หรือ ว/ด/ปปปป
+    const dateMatch = line.match(/(\d{1,2})\/( \d{1,2})\/(\d{2,4})/);
+    if(!dateMatch) continue;
+    
+    const rawDate = dateMatch[0];
+    const isoDate = thaiDateToISO(rawDate);
+    if(!isoDate) continue;
+    
+    // แปลงกลับเป็น d/m/yyyy สำหรับ GAS
+    const [y,mo,da] = isoDate.split("-");
+    const gasDate = `${parseInt(da)}/${parseInt(mo)}/${y}`;
+    
+    // ตรวจว่าเป็นวันหยุด/ไม่มีเวร OT
+    const lower = line.toLowerCase();
+    if(lower.includes("หยุด")||lower.includes("สงกราน")||lower.includes("วันหยุด")) continue;
+    
+    // หาเวรในบรรทัด (อาจมีหลายเวร เช่น เช้า + เย็น)
+    const shiftTexts = [];
+    
+    // แยกด้วย + หรือ ,
+    const parts = line.replace(rawDate,"").split(/[+,]/).map(s=>s.trim()).filter(s=>s);
+    
+    if(parts.length === 0){
+      shiftTexts.push(line.replace(rawDate,"").trim());
+    } else {
+      shiftTexts.push(...parts);
+    }
+    
+    for(const st of shiftTexts){
+      if(!st) continue;
+      const shift = detectShift(st);
+      entries.push({
+        date: gasDate,
+        displayDate: rawDate,
+        shiftName: shift.name,
+        hours: shift.hours,
+        startTime: shift.start,
+        endTime: shift.end,
+        money: Math.round(shift.hours * rate),
+        raw: st.trim()
+      });
+    }
+  }
+  return entries;
+}
+
+let importEntries = [];
+
+function parseAndPreview(){
+  const text = document.getElementById("importText").value.trim();
+  if(!text){ showErr("importError","กรุณาวางข้อความตารางเวรก่อนค่ะ"); return; }
+  
+  importEntries = parseScheduleText(text);
+  
+  if(!importEntries.length){ 
+    showErr("importError","ไม่พบข้อมูลวันที่ในข้อความ กรุณาตรวจสอบรูปแบบค่ะ"); 
+    return; 
+  }
+  
+  const preview = document.getElementById("importPreview");
+  const list = document.getElementById("previewList");
+  
+  list.innerHTML = importEntries.map((e,i)=>`
+    <div style="background:var(--teal-p);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">📅 ${e.date}</div>
+        <div style="font-size:11px;color:var(--text-l);">⏰ ${e.shiftName} · ${e.startTime}–${e.endTime} · ${e.hours} ชม.</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:800;color:var(--teal-d);">฿${e.money.toLocaleString()}</div>
+        <button onclick="importEntries.splice(${i},1);parseAndPreview2()" style="background:none;border:none;color:#e53935;font-size:10px;cursor:pointer;">ลบ</button>
+      </div>
+    </div>`).join("");
+  
+  const totalH = importEntries.reduce((a,e)=>a+e.hours,0);
+  const totalM = importEntries.reduce((a,e)=>a+e.money,0);
+  list.innerHTML += `<div style="background:var(--green-p);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700;color:var(--green);">รวม ${importEntries.length} รายการ · ${totalH} ชม. · ฿${totalM.toLocaleString()}</div>`;
+  
+  preview.style.display="block";
+}
+
+function parseAndPreview2(){
+  // re-render after delete
+  const preview = document.getElementById("importPreview");
+  const list = document.getElementById("previewList");
+  if(!importEntries.length){ preview.style.display="none"; return; }
+  
+  list.innerHTML = importEntries.map((e,i)=>`
+    <div style="background:var(--teal-p);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">📅 ${e.date}</div>
+        <div style="font-size:11px;color:var(--text-l);">⏰ ${e.shiftName} · ${e.startTime}–${e.endTime} · ${e.hours} ชม.</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:800;color:var(--teal-d);">฿${e.money.toLocaleString()}</div>
+        <button onclick="importEntries.splice(${i},1);parseAndPreview2()" style="background:none;border:none;color:#e53935;font-size:10px;cursor:pointer;">ลบ</button>
+      </div>
+    </div>`).join("");
+  
+  const totalH = importEntries.reduce((a,e)=>a+e.hours,0);
+  const totalM = importEntries.reduce((a,e)=>a+e.money,0);
+  list.innerHTML += `<div style="background:var(--green-p);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700;color:var(--green);">รวม ${importEntries.length} รายการ · ${totalH} ชม. · ฿${totalM.toLocaleString()}</div>`;
+}
+
+async function batchSaveOT(){
+  if(!importEntries.length){ alert("ไม่มีข้อมูลที่จะบันทึกค่ะ"); return; }
+  const btn = document.getElementById("btnBatchSave");
+  btn.disabled=true; btn.textContent="⏳ กำลังบันทึก...";
+  
+  let saved=0, failed=0;
+  for(const e of importEntries){
+    try{
+      const r = await fetch(GAS,{method:"POST",body:JSON.stringify({
+        action:"saveOT", userId:uid, date:e.date,
+        hours:e.hours, startTime:e.startTime, endTime:e.endTime
+      })});
+      const data = await r.json();
+      if(data.result==="ok"||data.money>=0) saved++;
+      else failed++;
+    }catch(err){ failed++; }
+    await new Promise(res=>setTimeout(res,300)); // delay ป้องกัน rate limit
+  }
+  
+  btn.disabled=false; btn.textContent="💾 บันทึกทั้งหมด";
+  document.getElementById("importPreview").style.display="none";
+  document.getElementById("importText").value="";
+  importEntries=[];
+  yearlyData={};
+  
+  showOv("","",`บันทึกแล้ว ${saved} รายการ ✅${failed?` (ล้มเหลว ${failed} รายการ)`:""}`);
+  if(document.getElementById("tab-summary").classList.contains("active")) loadSummary();
+}
+
+// ============================================================
+// VOICE RECOGNITION
+// ============================================================
+let recognition = null;
+function startVoice(){
+  const btn = document.getElementById("btnVoice");
+  const result = document.getElementById("voiceResult");
+  
+  if(!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)){
+    alert("เบราว์เซอร์นี้ไม่รองรับการพูดค่ะ กรุณาใช้ Chrome");
+    return;
+  }
+  
+  recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = "th-TH";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  
+  btn.textContent = "🔴 กำลังฟัง...";
+  btn.style.background = "linear-gradient(135deg,#B71C1C,#E53935)";
+  result.textContent = "กำลังฟัง...";
+  
+  recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    result.textContent = "ได้ยิน: " + text;
+    // นำไปใส่ใน importText แล้วให้ parse
+    const curr = document.getElementById("importText").value;
+    document.getElementById("importText").value = curr ? curr + "\n" + text : text;
+  };
+  
+  recognition.onerror = (e) => {
+    result.textContent = "เกิดข้อผิดพลาด: " + e.error;
+  };
+  
+  recognition.onend = () => {
+    btn.textContent = "🎤 กดเพื่อพูด";
+    btn.style.background = "linear-gradient(135deg,#7B1FA2,#AB47BC)";
+  };
+  
+  recognition.start();
+}
+
+// render shift settings เมื่อเปิด tab settings
+const origSwitchTab = switchTab;
+function switchTab(name, btn){
+  origSwitchTab(name, btn);
+  if(name === "settings") renderShiftSettings();
+}
+
 init();
 </script>
 </body>

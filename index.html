@@ -398,9 +398,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
 </p>
         <div class="fg">
           <label>📝 วางข้อความตารางเวร</label>
-          <div style="font-size:11px;color:#7B1FA2;margin-bottom:6px;font-weight:600;">
-            💡 พูดได้เลย: กดไอคอน 🎤 บนแป้นพิมพ์มือถือ → พูด เช่น "1 ทับ 4 ทับ 2026 เวรบ่าย" → ข้อความจะปรากฏที่นี่ค่ะ
-          </div>
+
           <textarea id="importText" rows="8" style="width:100%;padding:11px 13px;border:1.5px solid #D0EEF2;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:13px;color:var(--text);resize:vertical;" placeholder="เช่น&#10;1/4/2026 เวรบ่าย&#10;2/4/2026 เวรดึก&#10;3/4/2026 เวรคลินิก (เช้า)&#10;4/4/2026 เวรเช้า + เวรคลินิก (เย็น)"></textarea>
         </div>
         <button class="btn-submit" onclick="parseAndPreview()" style="margin-bottom:10px;">🔍 วิเคราะห์ตาราง</button>
@@ -472,7 +470,7 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
 </div>
 
 <script>
-const GAS="https://script.google.com/macros/s/AKfycbwoECwj3lbfMeBk-QSWOSiEjD7DGydN5UyIbylnvh5XOEwlA9aI_mMl0bJ2h2Jgi-u2hA/exec";
+const GAS="https://script.google.com/macros/s/AKfycbwplCECjXzFlQ_jqcWUxNRPn2STGGT0HMA8IqoHVytmrXGupAa8jOEOBYGeikNiP4Tncg/exec";
 let uid=null,uname=null,rate=0,cinTime=null;
 let sumMonth=new Date(2026,2,1); // March 2026 as default
 let editingIdx=null,currentRecs=[];
@@ -1203,47 +1201,6 @@ async function batchSaveOT(){
   if(document.getElementById("tab-summary").classList.contains("active")) loadSummary();
 }
 
-// ============================================================
-// VOICE RECOGNITION
-// ============================================================
-let recognition = null;
-function startVoice(){
-  const btn = document.getElementById("btnVoice");
-  const result = document.getElementById("voiceResult");
-  
-  if(!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)){
-    alert("เบราว์เซอร์นี้ไม่รองรับการพูดค่ะ กรุณาใช้ Chrome");
-    return;
-  }
-  
-  recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  recognition.lang = "th-TH";
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  
-  btn.textContent = "🔴 กำลังฟัง...";
-  btn.style.background = "linear-gradient(135deg,#B71C1C,#E53935)";
-  result.textContent = "กำลังฟัง...";
-  
-  recognition.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    result.textContent = "ได้ยิน: " + text;
-    // นำไปใส่ใน importText แล้วให้ parse
-    const curr = document.getElementById("importText").value;
-    document.getElementById("importText").value = curr ? curr + "\n" + text : text;
-  };
-  
-  recognition.onerror = (e) => {
-    result.textContent = "เกิดข้อผิดพลาด: " + e.error;
-  };
-  
-  recognition.onend = () => {
-    btn.textContent = "🎤 กดเพื่อพูด";
-    btn.style.background = "linear-gradient(135deg,#7B1FA2,#AB47BC)";
-  };
-  
-  recognition.start();
-}
 
 // render shift settings เมื่อเปิด tab settings
 function appendVoiceText(){
@@ -1254,6 +1211,8 @@ function appendVoiceText(){
   document.getElementById("voiceInput").value = "";
   showOv("","","เพิ่มข้อความแล้วค่ะ กด วิเคราะห์ตาราง ได้เลย ✅");
 }
+
+
 
 init();
 </script>

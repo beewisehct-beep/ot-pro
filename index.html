@@ -406,13 +406,21 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
         </div>
       </div>
       <div class="card">
-        <div class="card-title">🎤 พูดบันทึกเวร</div>
-        <p style="font-size:12px;color:var(--text-l);margin-bottom:12px;">กดปุ่มแล้วพูด เช่น "วันที่ 1 เดือน 4 เวรบ่าย"</p>
-        <button class="btn-submit" id="btnVoice" onclick="startVoice()" style="background:linear-gradient(135deg,#7B1FA2,#AB47BC);">
-          🎤 กดเพื่อพูด
+        <div class="card-title">🎤 พูดบันทึกผ่านแป้นพิมพ์</div>
+        <p style="font-size:12px;color:var(--text-l);margin-bottom:10px;line-height:1.7;">
+          กดไอคอน 🎤 บนแป้นพิมพ์มือถือ แล้วพูด เช่น<br>
+          <em>"1/4/2569 เวรบ่าย"</em> แล้วกดปุ่มเพิ่มค่ะ
+        </p>
+        <div class="fg">
+          <textarea id="voiceInput" rows="3"
+            style="width:100%;padding:11px 13px;border:1.5px solid #E1BEE7;border-radius:13px;font-family:'Noto Sans Thai',sans-serif;font-size:14px;color:var(--text);"
+            placeholder="พูดแล้วข้อความจะมาที่นี่ค่ะ"></textarea>
+        </div>
+        <button class="btn-submit" onclick="appendVoiceText()" style="background:linear-gradient(135deg,#7B1FA2,#AB47BC);">
+          ➕ เพิ่มไปยังช่องนำเข้า
         </button>
-        <div id="voiceResult" style="margin-top:10px;font-size:13px;color:var(--text-l);"></div>
       </div>
+
     </div>
 
     <!-- ตั้งค่า -->
@@ -1066,12 +1074,14 @@ function thaiDateToISO(dateStr){
 }
 
 function parseScheduleText(text){
-  const lines = text.split("\n").map(l=>l.trim()).filter(l=>l);
+  // รองรับทั้ง newline และ comma คั่น
+  const rawLines = text.split(/\n|,(?=\s*\d{1,2}\/)/);
+  const lines = rawLines.map(l=>l.trim()).filter(l=>l);
   const entries = [];
   
   for(const line of lines){
     // หาวันที่ในรูปแบบ ว/ด/ปป หรือ ว/ด/ปปปป
-    const dateMatch = line.match(/(\d{1,2})\/( \d{1,2})\/(\d{2,4})/);
+    const dateMatch = line.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if(!dateMatch) continue;
     
     const rawDate = dateMatch[0];
@@ -1246,6 +1256,15 @@ function startVoice(){
 }
 
 // render shift settings เมื่อเปิด tab settings
+function appendVoiceText(){
+  const voiceText = document.getElementById("voiceInput").value.trim();
+  if(!voiceText) return;
+  const curr = document.getElementById("importText").value;
+  document.getElementById("importText").value = curr ? curr + "\n" + voiceText : voiceText;
+  document.getElementById("voiceInput").value = "";
+  showOv("","","เพิ่มข้อความแล้วค่ะ กด วิเคราะห์ตาราง ได้เลย ✅");
+}
+
 init();
 </script>
 </body>

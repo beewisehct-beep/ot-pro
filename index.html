@@ -967,6 +967,7 @@ function switchTab(name,btn){
   btn.classList.add("active");document.getElementById("tab-"+name).classList.add("active");
   if(name==="summary"&&uid)loadSummary();
   if(name==="yearly"&&uid&&!yearlyData[curYear])loadYearlySummary();
+  if(name==="settings")renderShiftSettings();
 }
 
 function showOv(money,detail,customMsg){
@@ -1245,12 +1246,6 @@ function startVoice(){
 }
 
 // render shift settings เมื่อเปิด tab settings
-const origSwitchTab = switchTab;
-function switchTab(name, btn){
-  origSwitchTab(name, btn);
-  if(name === "settings") renderShiftSettings();
-}
-
 init();
 </script>
 </body>

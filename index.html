@@ -621,6 +621,26 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           </div>
         </div>
       </div>
+      <!-- Claude API Key Card -->
+      <div class="card" style="border:1.5px solid #FFCCBC;">
+        <div class="card-title" style="color:#E65100;">🤖 Claude API Key <span style="font-size:10px;background:#FBE9E7;color:#E65100;border-radius:6px;padding:2px 7px;font-weight:700;margin-left:4px;">สำหรับอ่านรูป</span></div>
+        <p style="font-size:11.5px;color:var(--text-l);line-height:1.7;margin-bottom:12px;">
+          ใส่ Claude API Key เพื่อใช้ฟีเจอร์อ่านรูปตารางเวรค่ะ<br>
+          ขอ key ได้ที่ <strong style="color:#E65100;">console.anthropic.com</strong>
+        </p>
+        <div id="apiKeyDisplay" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span id="apiKeyStatus" style="font-size:13px;font-weight:700;color:#2E7D32;">⏳ ยังไม่ได้ตั้งค่า</span>
+          <button onclick="toggleApiKeyForm()" style="background:var(--teal-p);border:none;color:var(--teal-d);border-radius:8px;padding:5px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;" id="apiKeyToggleBtn">✏️ ตั้งค่า</button>
+        </div>
+        <div id="apiKeyForm" style="display:none;">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-XXXXXXXX..."
+            style="width:100%;border:1.5px solid #FFCCBC;border-radius:12px;padding:11px 13px;font-family:'Courier New',monospace;font-size:12px;background:#FFF8F5;outline:none;margin-bottom:8px;">
+          <button onclick="saveApiKey()" style="width:100%;background:linear-gradient(135deg,#BF360C,#E64A19,#FF7043);color:#fff;border:none;border-radius:12px;padding:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">💾 บันทึก API Key</button>
+          <button onclick="clearApiKey()" style="width:100%;background:none;border:1.5px solid #FFCCBC;color:#E65100;border-radius:12px;padding:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;">🗑️ ลบ Key</button>
+          <p style="font-size:10.5px;color:#aaa;margin-top:8px;line-height:1.5;">Key จะถูกเก็บใน browser ของคุณเท่านั้น ไม่ถูกส่งไปที่ไหนนอกจาก Anthropic โดยตรงค่ะ</p>
+        </div>
+      </div>
+
       <div class="card" style="border-color:var(--teal-p)">
         <div class="card-title">👤 บัญชีของฉัน</div>
         <div style="font-size:13px;color:var(--text-l);line-height:2.4">
@@ -1160,7 +1180,7 @@ function switchTab(name,btn){
   btn.classList.add("active");document.getElementById("tab-"+name).classList.add("active");
   if(name==="summary"&&uid)loadSummary();
   if(name==="yearly"&&uid&&!yearlyData[curYear])loadYearlySummary();
-  if(name==="settings")renderShiftSettings();
+  if(name==="settings"){renderShiftSettings();loadApiKeyStatus();}
 }
 
 function showOv(money,detail,customMsg){
@@ -1718,18 +1738,36 @@ async function scanImageWithAI(dataUrl){
     status.innerHTML=`⏳ AI กำลังอ่าน... (${newKB} KB)`;
   }
 
+  // ดึง API Key จาก localStorage
+  const claudeKey = localStorage.getItem("claude_api_key")||"";
+  if(!claudeKey){
+    status.className="ai-status error";
+    status.innerHTML='❌ ยังไม่ได้ตั้งค่า API Key ค่ะ<br><small>ไปที่ ⚙️ ตั้งค่า → Claude API Key</small>';
+    return;
+  }
+
   try{
-    const res=await fetch(GAS,{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key": claudeKey,
+        "anthropic-version":"2023-06-01"
+      },
       body:JSON.stringify({
-        action:"scanImage",
-        userId:uid,
-        imageBase64:finalB64,
-        mediaType:mediaType
+        model:"claude-haiku-4-5-20251001",
+        max_tokens:800,
+        messages:[{
+          role:"user",
+          content:[
+            {type:"image", source:{type:"base64", media_type:mediaType, data:finalB64}},
+            {type:"text",  text:"จากรูปปฏิทินหรือตารางเวรนี้ ดึงวันที่และชื่อเวรออกมา\n\nตอบรูปแบบ:\nd/m/yyyy ชื่อเวร\n\nกฎ: เวรเช้า/C→เวรเช้า, เวรบ่าย/บ่าย→เวรบ่าย, เวรดึก/ดึก→เวรดึก, คลินิก→เวรคลินิก\nวันมีหลายเวร=หลายบรรทัด ตอบแค่รายการ ไม่ต้องอธิบาย\nอ่านไม่ออก→ ERROR: ไม่พบตารางเวร"}
+          ]
+        }]
       })
     });
     const data=await res.json();
-    const text=data.result||"";
+    const text=(data.content?.[0]?.text)||"";
     if(!text.trim()||text.startsWith("ERROR:")){
       status.className="ai-status error";
       status.innerHTML="❌ "+(text||"อ่านรูปไม่ได้ค่ะ ลองรูปอื่น");
@@ -1743,6 +1781,49 @@ async function scanImageWithAI(dataUrl){
     status.className="ai-status error";
     status.innerHTML="❌ เกิดข้อผิดพลาด: "+err.message+"<br><small>ลองใหม่อีกครั้งนะคะ</small>";
   }
+}
+
+/* ── CLAUDE API KEY MANAGEMENT ── */
+function loadApiKeyStatus(){
+  const key = localStorage.getItem("claude_api_key")||"";
+  const statusEl = document.getElementById("apiKeyStatus");
+  if(!statusEl) return;
+  if(key){
+    statusEl.textContent = "✅ ตั้งค่าแล้ว (" + key.slice(0,12) + "...)";
+    statusEl.style.color = "#2E7D32";
+    document.getElementById("apiKeyToggleBtn").textContent = "✏️ แก้ไข";
+  } else {
+    statusEl.textContent = "⚠️ ยังไม่ได้ตั้งค่า";
+    statusEl.style.color = "#E65100";
+    document.getElementById("apiKeyToggleBtn").textContent = "✏️ ตั้งค่า";
+  }
+}
+function toggleApiKeyForm(){
+  const form = document.getElementById("apiKeyForm");
+  const isOpen = form.style.display !== "none";
+  form.style.display = isOpen ? "none" : "block";
+  if(!isOpen){
+    const existing = localStorage.getItem("claude_api_key")||"";
+    document.getElementById("apiKeyInput").value = existing;
+  }
+}
+function saveApiKey(){
+  const key = document.getElementById("apiKeyInput").value.trim();
+  if(!key || !key.startsWith("sk-ant-")){
+    alert("API Key ไม่ถูกต้องค่ะ ต้องขึ้นต้นด้วย sk-ant-");
+    return;
+  }
+  localStorage.setItem("claude_api_key", key);
+  document.getElementById("apiKeyForm").style.display = "none";
+  loadApiKeyStatus();
+  showOv("","","บันทึก Claude API Key แล้วค่ะ ✅\nพร้อมใช้อ่านรูปตารางเวรได้เลย!");
+}
+function clearApiKey(){
+  if(!confirm("ลบ API Key ออกไหมคะ?")) return;
+  localStorage.removeItem("claude_api_key");
+  document.getElementById("apiKeyInput").value = "";
+  document.getElementById("apiKeyForm").style.display = "none";
+  loadApiKeyStatus();
 }
 </script>
 </body>

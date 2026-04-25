@@ -1708,6 +1708,8 @@ async function scanImageWithAI(dataUrl){
   const status=document.getElementById("aiStatus");
   status.style.display="block";
   status.className="ai-status loading";
+  status.innerHTML="⏳ เริ่มต้น...";
+  console.log("scanImageWithAI called, dataUrl length:", dataUrl.length);
 
   // แยก base64 และตรวจขนาด
   const [header,b64]=dataUrl.split(",");
@@ -1752,7 +1754,8 @@ async function scanImageWithAI(dataUrl){
       headers:{
         "Content-Type":"application/json",
         "x-api-key": claudeKey,
-        "anthropic-version":"2023-06-01"
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
       },
       body:JSON.stringify({
         model:"claude-haiku-4-5-20251001",
@@ -1767,10 +1770,24 @@ async function scanImageWithAI(dataUrl){
       })
     });
     const data=await res.json();
+    console.log("API response:", JSON.stringify(data).slice(0,200));
+
+    if(data.error){
+      const em=data.error.message||JSON.stringify(data.error);
+      status.className="ai-status error";
+      if(em.includes("credit")||em.includes("billing"))
+        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
+      else if(em.includes("api-key")||em.includes("auth"))
+        status.innerHTML="❌ API Key ไม่ถูกต้อง ตั้งค่าใหม่ที่ ⚙️ ตั้งค่าค่ะ";
+      else
+        status.innerHTML="❌ "+em;
+      return;
+    }
+
     const text=(data.content?.[0]?.text)||"";
     if(!text.trim()||text.startsWith("ERROR:")){
       status.className="ai-status error";
-      status.innerHTML="❌ "+(text||"อ่านรูปไม่ได้ค่ะ ลองรูปอื่น");
+      status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปใหม่ให้ชัดขึ้น";
       return;
     }
     document.getElementById("importTa").value=text.trim();
@@ -1778,8 +1795,13 @@ async function scanImageWithAI(dataUrl){
     status.innerHTML="✅ อ่านตารางสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
     setTimeout(()=>document.getElementById("importTa").scrollIntoView({behavior:"smooth",block:"center"}),300);
   }catch(err){
+    console.error("scanImage error:", err);
     status.className="ai-status error";
-    status.innerHTML="❌ เกิดข้อผิดพลาด: "+err.message+"<br><small>ลองใหม่อีกครั้งนะคะ</small>";
+    if(err.message.includes("Failed to fetch")||err.message.includes("CORS")){
+      status.innerHTML="❌ เชื่อมต่อ Anthropic ไม่ได้ค่ะ<br><small>ตรวจสอบอินเทอร์เน็ต หรือลองใหม่</small>";
+    } else {
+      status.innerHTML="❌ "+err.message+"<br><small>ลองใหม่อีกครั้งนะคะ</small>";
+    }
   }
 }
 

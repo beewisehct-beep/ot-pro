@@ -444,11 +444,22 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
         <div class="card-title">📋 นำเข้าตารางเวร</div>
 
         <!-- AI IMAGE SCAN SECTION -->
-        <div class="ai-upload-box" onclick="document.getElementById('calImgInput').click()">
-          <input type="file" id="calImgInput" accept="image/*" onchange="handleCalImg(event)">
+        <label for="calImgInput" class="ai-upload-box" style="display:block;cursor:pointer;">
+          <input type="file" id="calImgInput" accept="image/*"
+            style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"
+            onchange="handleCalImg(event)">
           <div class="ai-upload-icon">📷</div>
           <div class="ai-upload-lbl">ถ่ายรูป / อัปโหลดรูปตารางเวร</div>
           <div class="ai-upload-sub">AI อ่านรูปแล้วแปลงเป็นข้อความให้อัตโนมัติ ✨</div>
+        </label>
+
+        <!-- ปุ่ม Test API Key -->
+        <div style="text-align:center;margin-bottom:8px;">
+          <button onclick="testApiKey()"
+            style="background:none;border:1.5px solid var(--teal-pp);color:var(--teal-d);
+            border-radius:10px;padding:7px 16px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">
+            🧪 ทดสอบ API Key
+          </button>
         </div>
         <img id="calImgPreview" class="ai-preview-img">
         <div class="ai-status" id="aiStatus"></div>
@@ -1846,6 +1857,65 @@ function clearApiKey(){
   document.getElementById("apiKeyInput").value = "";
   document.getElementById("apiKeyForm").style.display = "none";
   loadApiKeyStatus();
+}
+
+/* ── TEST API KEY ── */
+async function testApiKey(){
+  const key = localStorage.getItem("claude_api_key")||"";
+  const status = document.getElementById("aiStatus");
+  status.style.display="block";
+
+  if(!key){
+    status.className="ai-status error";
+    status.innerHTML='❌ ยังไม่มี API Key ค่ะ ไปตั้งค่าที่ ⚙️ ตั้งค่า → Claude API Key';
+    return;
+  }
+
+  status.className="ai-status loading";
+  status.innerHTML="⏳ กำลังทดสอบ API Key...";
+
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key": key,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body: JSON.stringify({
+        model:"claude-haiku-4-5-20251001",
+        max_tokens:10,
+        messages:[{role:"user",content:"say hi"}]
+      })
+    });
+    const data = await res.json();
+    console.log("testApiKey response:", JSON.stringify(data));
+    if(data.error){
+      const em = data.error.message||"";
+      status.className="ai-status error";
+      if(em.includes("credit")||em.includes("billing"))
+        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
+      else if(em.includes("api-key")||em.includes("auth")||em.includes("invalid"))
+        status.innerHTML="❌ API Key ไม่ถูกต้องค่ะ";
+      else
+        status.innerHTML="❌ Error: "+em;
+    } else if(data.content){
+      status.className="ai-status";
+      status.innerHTML="✅ API Key ใช้งานได้! พร้อมอ่านรูปตารางเวรค่ะ";
+    } else {
+      status.className="ai-status error";
+      status.innerHTML="⚠️ ไม่แน่ใจ: "+JSON.stringify(data).slice(0,80);
+    }
+  }catch(err){
+    console.error("testApiKey error:", err);
+    status.className="ai-status error";
+    if(err.message.includes("Failed to fetch")){
+      status.innerHTML="❌ เชื่อมต่อ Anthropic ไม่ได้ค่ะ<br><small>อาจเป็นเพราะ LIFF browser block — ลองเปิดใน Safari/Chrome แทน</small>";
+    } else {
+      status.innerHTML="❌ "+err.message;
+    }
+  }
 }
 </script>
 </body>

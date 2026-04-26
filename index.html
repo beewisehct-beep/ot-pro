@@ -733,6 +733,29 @@ function init(){
   curYear = new Date().getFullYear();
   makeDraggable(document.getElementById("mascotWrap"));
 
+  // ตรวจสอบว่าเปิดจาก LINE หรือเปล่า
+  const isInLIFF = window.location.href.includes("liff.state") ||
+                   window.location.href.includes("liff/") ||
+                   (typeof liff !== "undefined" && liff.isInClient && liff.isInClient());
+
+  if (typeof liff === "undefined" || !isInLIFF) {
+    // เปิดจาก browser ปกติ — redirect ไป LINE
+    document.getElementById("loadingScreen").innerHTML = `
+      <div style="text-align:center;padding:40px 24px;">
+        <div style="font-size:52px;margin-bottom:14px;">📱</div>
+        <div style="font-size:17px;font-weight:800;color:#E64A19;margin-bottom:8px;">กรุณาเปิดในแอป LINE ค่ะ</div>
+        <div style="font-size:13px;color:#6D4C41;line-height:1.8;margin-bottom:20px;">
+          กดปุ่มด้านล่างเพื่อเปิดใน LINE<br>
+          หรือกด Rich Menu ในแชท LINE ค่ะ
+        </div>
+        <a href="https://liff.line.me/2009520328-4YznojXl"
+          style="display:inline-block;background:linear-gradient(135deg,#BF360C,#FF7043);color:#fff;text-decoration:none;border-radius:14px;padding:14px 32px;font-size:15px;font-weight:800;">
+          🟢 เปิดใน LINE
+        </a>
+      </div>`;
+    return;
+  }
+
   liff.init({ liffId: "2009520328-4YznojXl" })
     .then(() => {
       if (!liff.isLoggedIn()) { liff.login(); return null; }
@@ -757,10 +780,10 @@ function init(){
       document.getElementById("loadingScreen").innerHTML = `
         <div style="text-align:center;padding:40px 24px;">
           <div style="font-size:48px;margin-bottom:16px;">🔒</div>
-          <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
-          <div style="font-size:13px;color:#546E7A;line-height:1.6;">กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ</div>
+          <div style="font-size:17px;font-weight:800;color:#E64A19;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
+          <div style="font-size:13px;color:#6D4C41;line-height:1.6;">กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ</div>
           <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${msg}</div>
-          <button onclick="liff.login()" style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">🔄 เข้าสู่ระบบใหม่</button>
+          <button onclick="liff.login()" style="margin-top:16px;padding:10px 24px;background:#E64A19;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;">🔄 เข้าสู่ระบบใหม่</button>
         </div>`;
     });
 }

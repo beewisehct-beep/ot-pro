@@ -1770,6 +1770,54 @@ async function saveAdminKey(){
     }
   }catch(e){alert("Error: "+e.message);}
 }
+
+async function debugApiKey(){
+  const status=document.getElementById("aiStatus");
+  status.style.display="block";
+  status.className="ai-status loading";
+
+  const lines=[];
+  // 1. ตรวจ uid
+  lines.push("👤 uid: "+(uid||"ยังไม่มี"));
+
+  // 2. ตรวจ _ck ใน localStorage
+  const ck=localStorage.getItem("_ck")||"";
+  lines.push("🔑 API Key: "+(ck ? "✅ มี ("+ck.slice(0,12)+"...)" : "❌ ไม่มี"));
+
+  // 3. ลอง fetch key จาก GAS
+  try{
+    const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid||"test"})});
+    const d=await r.json();
+    lines.push("☁️ GAS key: "+(d.result ? "✅ มี ("+d.result.slice(0,12)+"...)" : "❌ ว่าง (ยังไม่ได้บันทึก)"));
+    if(d.result) localStorage.setItem("_ck",d.result);
+  }catch(e){
+    lines.push("☁️ GAS: ❌ "+e.message);
+  }
+
+  // 4. ทดสอบ Anthropic
+  const finalKey=localStorage.getItem("_ck")||"";
+  if(finalKey){
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":finalKey,
+          "anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:5,
+          messages:[{role:"user",content:"hi"}]})
+      });
+      const d=await r.json();
+      if(d.error) lines.push("🤖 Anthropic: ❌ "+d.error.message);
+      else lines.push("🤖 Anthropic: ✅ เชื่อมต่อได้!");
+    }catch(e){
+      lines.push("🤖 Anthropic: ❌ "+e.message);
+    }
+  } else {
+    lines.push("🤖 Anthropic: ⏭️ ข้าม (ไม่มี key)");
+  }
+
+  status.className="ai-status";
+  status.innerHTML=lines.join("<br>");
+}
 </script>
 </body>
 </html>

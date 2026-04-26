@@ -621,6 +621,21 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           </div>
         </div>
       </div>
+      <!-- Admin only: API Key management (hidden for normal users) -->
+      <div class="card" id="adminApiCard" style="display:none;border:1.5px solid #FFCCBC;">
+        <div class="card-title" style="color:#E65100;">🔑 Claude API Key <span style="font-size:10px;background:#FBE9E7;color:#E65100;border-radius:6px;padding:2px 7px;font-weight:700;">Admin</span></div>
+        <div id="adminKeyStatus" style="font-size:13px;font-weight:700;color:#666;margin-bottom:10px;"></div>
+        <div class="fg">
+          <label>API Key</label>
+          <input type="password" id="adminKeyInput" placeholder="sk-ant-api03-..."
+            style="width:100%;border:1.5px solid #FFCCBC;border-radius:12px;padding:11px 13px;font-family:monospace;font-size:12px;background:#FFF8F5;outline:none;">
+        </div>
+        <button onclick="saveAdminKey()"
+          style="width:100%;background:linear-gradient(135deg,#BF360C,#FF7043);color:#fff;border:none;border-radius:12px;padding:12px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">
+          💾 บันทึก Key ลง GAS
+        </button>
+      </div>
+
       <div class="card" style="border-color:var(--teal-p)">
         <div class="card-title">👤 บัญชีของฉัน</div>
         <div style="font-size:13px;color:var(--text-l);line-height:2.4">
@@ -730,8 +745,13 @@ function showApp(){
   document.getElementById("appContainer").style.display="";
   const sv=localStorage.getItem("ot_cin");
   if(sv){cinTime=new Date(sv);setWorking(true);setSpeech(WORK);document.getElementById("zzzSpan").style.display="none";}
+  // ดึง Claude API Key จาก GAS แบบ silent (ผู้ใช้ไม่เห็น)
+  fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid})})
+    .then(r=>r.json())
+    .then(d=>{if(d.result)localStorage.setItem("_ck",d.result);})
+    .catch(()=>{});
   loadRate();
-  loadSummary(); // ✅ เพิ่มบรรทัดนี้
+  loadSummary();
 }
 
 function openNameModal(){document.getElementById("nameInput").value=uname||"";document.getElementById("nameModal").classList.add("show");}
@@ -1158,7 +1178,19 @@ function switchTab(name,btn){
   btn.classList.add("active");document.getElementById("tab-"+name).classList.add("active");
   if(name==="summary"&&uid)loadSummary();
   if(name==="yearly"&&uid&&!yearlyData[curYear])loadYearlySummary();
-  if(name==="settings")renderShiftSettings();
+  if(name==="settings"){
+    renderShiftSettings();
+    // แสดง admin card เฉพาะ admin
+    const ac=document.getElementById("adminApiCard");
+    if(ac){
+      const isAdmin=(uid==="Ud34d5368a1156dfd06330fe752b85cca");
+      ac.style.display=isAdmin?"block":"none";
+      if(isAdmin){
+        const cur=localStorage.getItem("_ck")||"";
+        document.getElementById("adminKeyStatus").textContent=cur?"✅ Key ตั้งค่าแล้ว ("+cur.slice(0,15)+"...)":"⚠️ ยังไม่มี Key";
+      }
+    }
+  }
 }
 
 function showOv(money,detail,customMsg){
@@ -1577,6 +1609,16 @@ async function scanImageWithAI(dataUrl){
   const status=document.getElementById("aiStatus");
   status.style.display="block"; status.className="ai-status loading";
   status.innerHTML="⏳ กำลังเตรียมรูป...";
+
+  // ดึง key จาก localStorage (ถูก set ตอน showApp โดยอัตโนมัติ)
+  const claudeKey=localStorage.getItem("_ck")||"";
+  if(!claudeKey){
+    status.className="ai-status error";
+    status.innerHTML="❌ ระบบยังไม่พร้อม ลองปิดแล้วเปิดใหม่ค่ะ";
+    return;
+  }
+
+  // บีบรูป max 500px quality 0.6
   let finalB64=dataUrl.split(",")[1];
   try{
     const img2=new Image(); img2.src=dataUrl;
@@ -1587,23 +1629,51 @@ async function scanImageWithAI(dataUrl){
     c.getContext("2d").drawImage(img2,0,0,w,h);
     finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
   }catch(e){}
+
   const sizeKB=Math.round(finalB64.length*0.75/1024);
   status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
+
   try{
-    const res=await fetch(GAS,{method:"POST",
-      body:JSON.stringify({action:"scanImage",userId:uid,imageBase64:finalB64,mediaType:"image/jpeg"})
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key":claudeKey,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body:JSON.stringify({
+        model:"claude-haiku-4-5-20251001",
+        max_tokens:800,
+        messages:[{role:"user",content:[
+          {type:"image",source:{type:"base64",media_type:"image/jpeg",data:finalB64}},
+          {type:"text",text:"จากรูปปฏิทินหรือตารางเวรนี้ ดึงวันที่และชื่อเวรออกมา\n\nตอบรูปแบบ:\nd/m/yyyy ชื่อเวร\n\nกฎ: เวรเช้า/C→เวรเช้า, เวรบ่าย→เวรบ่าย, เวรดึก→เวรดึก, คลินิก→เวรคลินิก\nวันมีหลายเวร=หลายบรรทัด ไม่ต้องอธิบาย\nอ่านไม่ออก→ ERROR: ไม่พบตารางเวร"}
+        ]}]
+      })
     });
     const data=await res.json();
-    if(data.error){status.className="ai-status error";status.innerHTML="❌ "+data.error;return;}
-    const text=data.result||"";
+    if(data.error){
+      status.className="ai-status error";
+      const em=data.error.message||"";
+      if(em.includes("credit")||em.includes("billing"))
+        status.innerHTML="❌ เครดิต API หมดค่ะ";
+      else
+        status.innerHTML="❌ "+em;
+      return;
+    }
+    const text=(data.content?.[0]?.text)||"";
     if(!text.trim()||text.startsWith("ERROR:")){
-      status.className="ai-status error";status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปให้ชัดขึ้น";return;
+      status.className="ai-status error";
+      status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปให้ชัดขึ้น"; return;
     }
     document.getElementById("importText").value=text.trim();
     status.className="ai-status";
     status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
     setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
-  }catch(err){status.className="ai-status error";status.innerHTML="❌ "+err.message;}
+  }catch(err){
+    status.className="ai-status error";
+    status.innerHTML="❌ "+err.message;
+  }
 }
 
 /* ── AI IMAGE SCAN ── */
@@ -1658,6 +1728,24 @@ async function scanImageWithAI(dataUrl){
     status.className="ai-status error";
     status.innerHTML="❌ เกิดข้อผิดพลาด: "+err.message;
   }
+}
+
+/* ── ADMIN API KEY MANAGEMENT ── */
+async function saveAdminKey(){
+  const key=document.getElementById("adminKeyInput").value.trim();
+  if(!key||!key.startsWith("sk-ant-")){alert("Key ไม่ถูกต้องค่ะ");return;}
+  try{
+    const res=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"saveApiKey",userId:uid,apiKey:key})});
+    const data=await res.json();
+    if(data.result==="ok"){
+      localStorage.setItem("_ck",key);
+      document.getElementById("adminKeyStatus").textContent="✅ บันทึกแล้ว ("+key.slice(0,15)+"...)";
+      document.getElementById("adminKeyInput").value="";
+      showOv("","","บันทึก API Key ลง GAS แล้วค่ะ ✅");
+    } else {
+      alert("บันทึกไม่สำเร็จ: "+JSON.stringify(data));
+    }
+  }catch(e){alert("Error: "+e.message);}
 }
 </script>
 </body>

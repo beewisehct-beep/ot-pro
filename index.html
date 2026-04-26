@@ -1687,13 +1687,13 @@ d/m/yyyy ชื่อเวร
     }
 
     // ใส่ใน textarea
-    document.getElementById("importTa").value = text.trim();
+    document.getElementById("importText").value = text.trim();
     status.className = "ai-status";
     status.innerHTML = "✅ อ่านตารางเวรสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ";
 
     // auto scroll ไป textarea
     setTimeout(()=>{
-      document.getElementById("importTa").scrollIntoView({behavior:"smooth",block:"center"});
+      document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"});
     }, 300);
 
   } catch(err) {
@@ -1801,10 +1801,10 @@ async function scanImageWithAI(dataUrl){
       status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปใหม่ให้ชัดขึ้น";
       return;
     }
-    document.getElementById("importTa").value=text.trim();
+    document.getElementById("importText").value=text.trim();
     status.className="ai-status";
     status.innerHTML="✅ อ่านตารางสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
-    setTimeout(()=>document.getElementById("importTa").scrollIntoView({behavior:"smooth",block:"center"}),300);
+    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
   }catch(err){
     console.error("scanImage error:", err);
     status.className="ai-status error";

@@ -1600,6 +1600,33 @@ document.querySelectorAll('input[name="ot2wht"]').forEach(r=>{
 
 /* ── AI IMAGE SCAN ── */
 async function handleCalImg(e){
+  const file=e.target.files[0]; if(!file) return;
+
+  const status=document.getElementById("aiStatus");
+  status.style.display="block"; status.className="ai-status loading";
+  status.innerHTML="⏳ กำลังอ่านรูป...";
+
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    try{
+      const dataUrl=ev.target.result;
+
+      // preview
+      const prev=document.getElementById("calImgPreview");
+      prev.src=dataUrl; prev.style.display="block";
+
+      await scanImageWithAI(dataUrl);
+    }catch(err){
+      status.className="ai-status error";
+      status.innerHTML="❌ "+err.message;
+    }
+  };
+  reader.onerror=()=>{
+    status.className="ai-status error";
+    status.innerHTML="❌ อ่านไฟล์ไม่ได้ค่ะ";
+  };
+  reader.readAsDataURL(file);
+}sync function handleCalImg(e){
   const file = e.target.files[0];
   if(!file) return;
 

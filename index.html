@@ -444,8 +444,10 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
         <div class="card-title">📋 นำเข้าตารางเวร</div>
 
         <!-- AI IMAGE SCAN SECTION -->
-        <div class="ai-upload-box" onclick="document.getElementById('calImgInput').click()">
-          <input type="file" id="calImgInput" accept="image/*" onchange="handleCalImg(event)">
+        <div class="ai-upload-box" style="position:relative;overflow:hidden;">
+          <input type="file" id="calImgInput" accept="image/*"
+            onchange="handleCalImg(event)"
+            style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
           <div class="ai-upload-icon">📷</div>
           <div class="ai-upload-lbl">ถ่ายรูป / อัปโหลดรูปตารางเวร</div>
           <div class="ai-upload-sub">AI อ่านรูปแล้วแปลงเป็นข้อความให้อัตโนมัติ ✨</div>

@@ -293,6 +293,52 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
 .ai-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--text-l);font-size:12px;font-weight:700;}
 .ai-divider::before,.ai-divider::after{content:"";flex:1;height:1px;background:var(--teal-pp);}
 
+
+async function scanImageWithAI(dataUrl){
+  const status=document.getElementById("aiStatus");
+  status.style.display="block"; status.className="ai-status loading";
+  status.innerHTML="⏳ กำลังเตรียมรูป...";
+
+  let finalB64=dataUrl.split(",")[1];
+  try{
+    const img2=new Image(); img2.src=dataUrl;
+    await new Promise(r=>{img2.onload=r;});
+    const MAX=500; let w=img2.width,h=img2.height;
+    if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    c.getContext("2d").drawImage(img2,0,0,w,h);
+    finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
+  }catch(e){console.warn("resize:",e);}
+
+  const sizeKB=Math.round(finalB64.length*0.75/1024);
+  status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
+
+  try{
+    const res=await fetch(GAS,{
+      method:"POST",
+      body:JSON.stringify({action:"scanImage",userId:uid,imageBase64:finalB64,mediaType:"image/jpeg"})
+    });
+    const data=await res.json();
+    console.log("scanImage:",JSON.stringify(data).slice(0,200));
+    if(data.error){
+      status.className="ai-status error";
+      status.innerHTML="❌ "+data.error; return;
+    }
+    const text=data.result||"";
+    if(!text.trim()||text.startsWith("ERROR:")){
+      status.className="ai-status error";
+      status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปให้ชัดขึ้นนะคะ"; return;
+    }
+    document.getElementById("importText").value=text.trim();
+    status.className="ai-status";
+    status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
+    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
+  }catch(err){
+    console.error("scanImage err:",err);
+    status.className="ai-status error";
+    status.innerHTML="❌ "+err.message;
+  }
+}
 /* ── AI IMAGE SCAN ── */
 .ai-upload-box{border:2.5px dashed var(--teal-pp);border-radius:16px;padding:20px 16px;text-align:center;cursor:pointer;background:linear-gradient(135deg,#FFF8F5,#FFF3EE);transition:all .2s;position:relative;margin-bottom:12px;}
 .ai-upload-box:hover{border-color:var(--teal-d);background:#FFF3EE;}
@@ -452,17 +498,6 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           <div class="ai-upload-lbl">ถ่ายรูป / อัปโหลดรูปตารางเวร</div>
           <div class="ai-upload-sub">AI อ่านรูปแล้วแปลงเป็นข้อความให้อัตโนมัติ ✨</div>
         </label>
-
-        <!-- ปุ่ม Test API Key -->
-        <div style="text-align:center;margin-bottom:8px;">
-          <button onclick="testApiKey()"
-            style="background:none;border:1.5px solid var(--teal-pp);color:var(--teal-d);
-            border-radius:10px;padding:7px 16px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">
-            🧪 ทดสอบ API Key
-          </button>
-        </div>
-        <img id="calImgPreview" class="ai-preview-img">
-        <div class="ai-status" id="aiStatus"></div>
 
         <div class="ai-divider">หรือพิมพ์ / วางข้อความเอง</div>
 
@@ -632,26 +667,6 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
           </div>
         </div>
       </div>
-      <!-- Claude API Key Card -->
-      <div class="card" style="border:1.5px solid #FFCCBC;">
-        <div class="card-title" style="color:#E65100;">🤖 Claude API Key <span style="font-size:10px;background:#FBE9E7;color:#E65100;border-radius:6px;padding:2px 7px;font-weight:700;margin-left:4px;">สำหรับอ่านรูป</span></div>
-        <p style="font-size:11.5px;color:var(--text-l);line-height:1.7;margin-bottom:12px;">
-          ใส่ Claude API Key เพื่อใช้ฟีเจอร์อ่านรูปตารางเวรค่ะ<br>
-          ขอ key ได้ที่ <strong style="color:#E65100;">console.anthropic.com</strong>
-        </p>
-        <div id="apiKeyDisplay" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <span id="apiKeyStatus" style="font-size:13px;font-weight:700;color:#2E7D32;">⏳ ยังไม่ได้ตั้งค่า</span>
-          <button onclick="toggleApiKeyForm()" style="background:var(--teal-p);border:none;color:var(--teal-d);border-radius:8px;padding:5px 12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;" id="apiKeyToggleBtn">✏️ ตั้งค่า</button>
-        </div>
-        <div id="apiKeyForm" style="display:none;">
-          <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-XXXXXXXX..."
-            style="width:100%;border:1.5px solid #FFCCBC;border-radius:12px;padding:11px 13px;font-family:'Courier New',monospace;font-size:12px;background:#FFF8F5;outline:none;margin-bottom:8px;">
-          <button onclick="saveApiKey()" style="width:100%;background:linear-gradient(135deg,#BF360C,#E64A19,#FF7043);color:#fff;border:none;border-radius:12px;padding:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">💾 บันทึก API Key</button>
-          <button onclick="clearApiKey()" style="width:100%;background:none;border:1.5px solid #FFCCBC;color:#E65100;border-radius:12px;padding:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;">🗑️ ลบ Key</button>
-          <p style="font-size:10.5px;color:#aaa;margin-top:8px;line-height:1.5;">Key จะถูกเก็บใน browser ของคุณเท่านั้น ไม่ถูกส่งไปที่ไหนนอกจาก Anthropic โดยตรงค่ะ</p>
-        </div>
-      </div>
-
       <div class="card" style="border-color:var(--teal-p)">
         <div class="card-title">👤 บัญชีของฉัน</div>
         <div style="font-size:13px;color:var(--text-l);line-height:2.4">
@@ -1191,7 +1206,7 @@ function switchTab(name,btn){
   btn.classList.add("active");document.getElementById("tab-"+name).classList.add("active");
   if(name==="summary"&&uid)loadSummary();
   if(name==="yearly"&&uid&&!yearlyData[curYear])loadYearlySummary();
-  if(name==="settings"){renderShiftSettings();loadApiKeyStatus();}
+  if(name==="settings")renderShiftSettings();
 }
 
 function showOv(money,detail,customMsg){
@@ -1631,245 +1646,13 @@ function resizeImage(file, maxPx, quality){
   });
 }
 
-async function scanImageWithAI(dataUrl){
-  const status = document.getElementById("aiStatus");
-  status.style.display = "block";
-  status.className = "ai-status loading";
-  status.innerHTML = "⏳ AI กำลังอ่านตารางเวร...";
-
-  // แปลง dataUrl เป็น base64
-  const [header, b64] = dataUrl.split(",");
-  const mimeMatch = header.match(/data:([^;]+)/);
-  const mediaType = mimeMatch ? mimeMatch[1] : "image/jpeg";
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: b64 }
-            },
-            {
-              type: "text",
-              text: `จากรูปปฏิทินหรือตารางเวรนี้ ให้ดึงข้อมูลวันที่และชื่อเวรออกมา
-
-ตอบในรูปแบบนี้เท่านั้น (ทุกบรรทัด):
-d/m/yyyy ชื่อเวร
-
-กฎ:
-- ถ้าเห็นคำว่า "เวรเช้า" หรือ "C" ให้ใช้: เวรเช้า
-- ถ้าเห็น "เวรบ่าย" หรือ "บ่าย" ให้ใช้: เวรบ่าย
-- ถ้าเห็น "เวรดึก" หรือ "ดึก" ให้ใช้: เวรดึก
-- ถ้าเห็น "คลินิก" หรือ "clinic" ให้ใช้: เวรคลินิก
-- ถ้าวันหนึ่งมีหลายเวร ให้แยกเป็นหลายบรรทัด
-- ไม่ต้องมีคำอธิบาย ตอบแค่ตาราง
-- ถ้าอ่านไม่ออกหรือไม่มีตาราง ให้ตอบว่า ERROR: ไม่พบตารางเวร`
-            }
-          ]
-        }]
-      })
-    });
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text || "";
-
-    if(text.startsWith("ERROR:") || !text.trim()){
-      status.className = "ai-status error";
-      status.innerHTML = "❌ " + (text || "อ่านรูปไม่ได้ค่ะ ลองรูปอื่น");
-      return;
-    }
-
-    // ใส่ใน textarea
-    document.getElementById("importText").value = text.trim();
-    status.className = "ai-status";
-    status.innerHTML = "✅ อ่านตารางเวรสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ";
-
-    // auto scroll ไป textarea
-    setTimeout(()=>{
-      document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"});
-    }, 300);
-
-  } catch(err) {
-    status.className = "ai-status error";
-    status.innerHTML = "❌ เกิดข้อผิดพลาด: " + err.message;
-  }
-}
 
 /* ── AI IMAGE SCAN ── */
-async function handleCalImg(e){
-  const file=e.target.files[0]; if(!file)return;
-  const reader=new FileReader();
-  reader.onload=async(ev)=>{
-    const dataUrl=ev.target.result;
-    const preview=document.getElementById("calImgPreview");
-    preview.src=dataUrl; preview.style.display="block";
-    await scanImageWithAI(dataUrl);
-  };
-  reader.readAsDataURL(file);
-}
 
-async function scanImageWithAI(dataUrl){
-  const status=document.getElementById("aiStatus");
-  status.style.display="block";
-  status.className="ai-status loading";
-  status.innerHTML="⏳ เริ่มต้น...";
-  console.log("scanImageWithAI called, dataUrl length:", dataUrl.length);
 
-  // แยก base64 และตรวจขนาด
-  const [header,b64]=dataUrl.split(",");
-  const mimeMatch=header.match(/data:([^;]+)/);
-  const mediaType="image/jpeg"; // force JPEG เสมอ
 
-  // คำนวณขนาด KB
-  const sizeKB = Math.round(b64.length * 0.75 / 1024);
-  status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
 
-  // ถ้ายังใหญ่เกิน 400KB ให้บีบอีกรอบ
-  let finalB64 = b64;
-  if(sizeKB > 400){
-    status.innerHTML=`⏳ บีบรูปเพิ่ม... (${sizeKB}KB → เล็กลง)`;
-    const img2 = new Image();
-    img2.src = dataUrl;
-    await new Promise(r=>img2.onload=r);
-    const maxPx2 = sizeKB > 800 ? 600 : 700;
-    let w2=img2.width, h2=img2.height;
-    if(w2>h2){h2=Math.round(h2*maxPx2/w2);w2=maxPx2;}
-    else{w2=Math.round(w2*maxPx2/h2);h2=maxPx2;}
-    const c=document.createElement("canvas");
-    c.width=w2; c.height=h2;
-    c.getContext("2d").drawImage(img2,0,0,w2,h2);
-    const smaller=c.toDataURL("image/jpeg",0.65);
-    finalB64=smaller.split(",")[1];
-    const newKB=Math.round(finalB64.length*0.75/1024);
-    status.innerHTML=`⏳ AI กำลังอ่าน... (${newKB} KB)`;
-  }
 
-  // ดึง API Key จาก localStorage
-  const claudeKey = localStorage.getItem("claude_api_key")||"";
-  if(!claudeKey){
-    status.className="ai-status error";
-    status.innerHTML='❌ ยังไม่ได้ตั้งค่า API Key ค่ะ<br><small>ไปที่ ⚙️ ตั้งค่า → Claude API Key</small>';
-    return;
-  }
-
-  try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "x-api-key": claudeKey,
-        "anthropic-version":"2023-06-01",
-        "anthropic-dangerous-direct-browser-access":"true"
-      },
-      body:JSON.stringify({
-        model:"claude-haiku-4-5-20251001",
-        max_tokens:800,
-        messages:[{
-          role:"user",
-          content:[
-            {type:"image", source:{type:"base64", media_type:mediaType, data:finalB64}},
-            {type:"text",  text:"จากรูปปฏิทินหรือตารางเวรนี้ ดึงวันที่และชื่อเวรออกมา\n\nตอบรูปแบบ:\nd/m/yyyy ชื่อเวร\n\nกฎ: เวรเช้า/C→เวรเช้า, เวรบ่าย/บ่าย→เวรบ่าย, เวรดึก/ดึก→เวรดึก, คลินิก→เวรคลินิก\nวันมีหลายเวร=หลายบรรทัด ตอบแค่รายการ ไม่ต้องอธิบาย\nอ่านไม่ออก→ ERROR: ไม่พบตารางเวร"}
-          ]
-        }]
-      })
-    });
-    const data=await res.json();
-    console.log("API response:", JSON.stringify(data).slice(0,200));
-
-    if(data.error){
-      const em=data.error.message||JSON.stringify(data.error);
-      status.className="ai-status error";
-      if(em.includes("credit")||em.includes("billing"))
-        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
-      else if(em.includes("api-key")||em.includes("auth"))
-        status.innerHTML="❌ API Key ไม่ถูกต้อง ตั้งค่าใหม่ที่ ⚙️ ตั้งค่าค่ะ";
-      else
-        status.innerHTML="❌ "+em;
-      return;
-    }
-
-    const text=(data.content?.[0]?.text)||"";
-    if(!text.trim()||text.startsWith("ERROR:")){
-      status.className="ai-status error";
-      status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปใหม่ให้ชัดขึ้น";
-      return;
-    }
-    document.getElementById("importText").value=text.trim();
-    status.className="ai-status";
-    status.innerHTML="✅ อ่านตารางสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
-    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
-  }catch(err){
-    console.error("scanImage error:", err);
-    status.className="ai-status error";
-    if(err.message.includes("Failed to fetch")||err.message.includes("CORS")){
-      status.innerHTML="❌ เชื่อมต่อ Anthropic ไม่ได้ค่ะ<br><small>ตรวจสอบอินเทอร์เน็ต หรือลองใหม่</small>";
-    } else {
-      status.innerHTML="❌ "+err.message+"<br><small>ลองใหม่อีกครั้งนะคะ</small>";
-    }
-  }
-}
-
-/* ── CLAUDE API KEY MANAGEMENT ── */
-function loadApiKeyStatus(){
-  const key = localStorage.getItem("claude_api_key")||"";
-  const statusEl = document.getElementById("apiKeyStatus");
-  if(!statusEl) return;
-  if(key){
-    statusEl.textContent = "✅ ตั้งค่าแล้ว (" + key.slice(0,12) + "...)";
-    statusEl.style.color = "#2E7D32";
-    document.getElementById("apiKeyToggleBtn").textContent = "✏️ แก้ไข";
-  } else {
-    statusEl.textContent = "⚠️ ยังไม่ได้ตั้งค่า";
-    statusEl.style.color = "#E65100";
-    document.getElementById("apiKeyToggleBtn").textContent = "✏️ ตั้งค่า";
-  }
-}
-function toggleApiKeyForm(){
-  const form = document.getElementById("apiKeyForm");
-  const isOpen = form.style.display !== "none";
-  form.style.display = isOpen ? "none" : "block";
-  if(!isOpen){
-    const existing = localStorage.getItem("claude_api_key")||"";
-    document.getElementById("apiKeyInput").value = existing;
-  }
-}
-function saveApiKey(){
-  const key = document.getElementById("apiKeyInput").value.trim();
-  if(!key || !key.startsWith("sk-ant-")){
-    alert("API Key ไม่ถูกต้องค่ะ ต้องขึ้นต้นด้วย sk-ant-");
-    return;
-  }
-  localStorage.setItem("claude_api_key", key);
-  document.getElementById("apiKeyForm").style.display = "none";
-  loadApiKeyStatus();
-  showOv("","","บันทึก Claude API Key แล้วค่ะ ✅\nพร้อมใช้อ่านรูปตารางเวรได้เลย!");
-}
-function clearApiKey(){
-  if(!confirm("ลบ API Key ออกไหมคะ?")) return;
-  localStorage.removeItem("claude_api_key");
-  document.getElementById("apiKeyInput").value = "";
-  document.getElementById("apiKeyForm").style.display = "none";
-  loadApiKeyStatus();
-}
-
-/* ── TEST API KEY ── */
-async function testApiKey(){
-  const key = localStorage.getItem("claude_api_key")||"";
-  const status = document.getElementById("aiStatus");
-  status.style.display="block";
-
-  if(!key){
-    status.className="ai-status error";
-    status.innerHTML='❌ ยังไม่มี API Key ค่ะ ไปตั้งค่าที่ ⚙️ ตั้งค่า → Claude API Key';
-    return;
-  }
 
   status.className="ai-status loading";
   status.innerHTML="⏳ กำลังทดสอบ API Key...";
@@ -1880,9 +1663,7 @@ async function testApiKey(){
       headers:{
         "Content-Type":"application/json",
         "x-api-key": key,
-        "anthropic-version":"2023-06-01",
-        "anthropic-dangerous-direct-browser-access":"true"
-      },
+        "anthropic-version":"2023-06-01",},
       body: JSON.stringify({
         model:"claude-haiku-4-5-20251001",
         max_tokens:10,
@@ -1890,7 +1671,7 @@ async function testApiKey(){
       })
     });
     const data = await res.json();
-    console.log("testApiKey response:", JSON.stringify(data));
+    console.log("scan response:", JSON.stringify(data));
     if(data.error){
       const em = data.error.message||"";
       status.className="ai-status error";
@@ -1908,7 +1689,7 @@ async function testApiKey(){
       status.innerHTML="⚠️ ไม่แน่ใจ: "+JSON.stringify(data).slice(0,80);
     }
   }catch(err){
-    console.error("testApiKey error:", err);
+    console.error("scan error:", err);
     status.className="ai-status error";
     if(err.message.includes("Failed to fetch")){
       status.innerHTML="❌ เชื่อมต่อ Anthropic ไม่ได้ค่ะ<br><small>อาจเป็นเพราะ LIFF browser block — ลองเปิดใน Safari/Chrome แทน</small>";

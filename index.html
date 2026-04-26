@@ -443,6 +443,18 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
       <div class="card">
         <div class="card-title">📋 นำเข้าตารางเวร</div>
 
+        <!-- API Key input — เล็กๆ ไม่สะดุดตา -->
+        <div id="apiKeySection" style="margin-bottom:12px;padding:10px 12px;background:#FFF8F5;border-radius:12px;border:1px solid #FFE0CC;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:#aaa;flex-shrink:0;">🔑</span>
+            <input type="password" id="inlineApiKey"
+              placeholder="API Key (ตั้งค่าครั้งแรกครั้งเดียว)"
+              style="flex:1;border:none;background:none;font-size:11px;color:#888;outline:none;font-family:monospace;"
+              oninput="saveInlineKey(this.value)">
+            <span id="inlineKeyStatus" style="font-size:11px;flex-shrink:0;"></span>
+          </div>
+        </div>
+
         <!-- AI IMAGE SCAN SECTION -->
         <div class="ai-upload-box" onclick="document.getElementById('calImgInput').click()">
           <input type="file" id="calImgInput" accept="image/*" onchange="handleCalImg(event)">
@@ -1610,30 +1622,11 @@ async function scanImageWithAI(dataUrl){
   status.style.display="block"; status.className="ai-status loading";
   status.innerHTML="⏳ กำลังเตรียมรูป...";
 
-  // ดึง key จาก localStorage
   const claudeKey=localStorage.getItem("_ck")||"";
   if(!claudeKey){
-    // ถ้าไม่มี key ลอง fetch จาก GAS ใหม่อีกครั้ง
-    status.innerHTML="⏳ กำลังโหลด API Key...";
-    try{
-      const kr=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid})});
-      const kd=await kr.json();
-      if(kd.result) localStorage.setItem("_ck", kd.result);
-      else {
-        status.className="ai-status error";
-        status.innerHTML='❌ ยังไม่ได้ตั้งค่า API Key ค่ะ<br><small>Admin กรุณาไปที่ ⚙️ ตั้งค่า → บันทึก API Key ก่อนนะคะ</small>';
-        return;
-      }
-    }catch(e){
-      status.className="ai-status error";
-      status.innerHTML="❌ โหลด Key ไม่ได้: "+e.message; return;
-    }
-  }
-
-  const finalKey=localStorage.getItem("_ck")||"";
-  if(!finalKey){
     status.className="ai-status error";
-    status.innerHTML="❌ ไม่มี API Key ค่ะ Admin กรุณาตั้งค่าก่อน"; return;
+    status.innerHTML='❌ กรุณาใส่ API Key ในช่องด้านบนก่อนค่ะ 🔑';
+    return;
   }
 
   // บีบรูป max 500px quality 0.6
@@ -1646,7 +1639,7 @@ async function scanImageWithAI(dataUrl){
     const c=document.createElement("canvas"); c.width=w; c.height=h;
     c.getContext("2d").drawImage(img2,0,0,w,h);
     finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
-  }catch(e){console.warn("resize:",e);}
+  }catch(e){}
 
   const sizeKB=Math.round(finalB64.length*0.75/1024);
   status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
@@ -1656,33 +1649,29 @@ async function scanImageWithAI(dataUrl){
       method:"POST",
       headers:{
         "Content-Type":"application/json",
-        "x-api-key":finalKey,
+        "x-api-key":claudeKey,
         "anthropic-version":"2023-06-01",
         "anthropic-dangerous-direct-browser-access":"true"
       },
       body:JSON.stringify({
-        model:"claude-haiku-4-5-20251001",
-        max_tokens:800,
+        model:"claude-haiku-4-5-20251001",max_tokens:800,
         messages:[{role:"user",content:[
           {type:"image",source:{type:"base64",media_type:"image/jpeg",data:finalB64}},
           {type:"text",text:"จากรูปปฏิทินหรือตารางเวรนี้ ดึงวันที่และชื่อเวรออกมา\n\nตอบรูปแบบ:\nd/m/yyyy ชื่อเวร\n\nกฎ: เวรเช้า/C→เวรเช้า, เวรบ่าย→เวรบ่าย, เวรดึก→เวรดึก, คลินิก→เวรคลินิก\nวันมีหลายเวร=หลายบรรทัด ไม่ต้องอธิบาย\nอ่านไม่ออก→ ERROR: ไม่พบตารางเวร"}
         ]}]
       })
     });
-
     const data=await res.json();
     if(data.error){
       status.className="ai-status error";
-      const em=data.error.message||JSON.stringify(data.error);
+      const em=data.error.message||"";
       if(em.includes("credit")||em.includes("billing"))
-        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
+        status.innerHTML="❌ เครดิต API หมดค่ะ";
       else if(em.includes("api-key")||em.includes("auth")||em.includes("invalid"))
-        status.innerHTML="❌ API Key ไม่ถูกต้อง Admin กรุณาตั้งค่าใหม่ที่ ⚙️";
-      else
-        status.innerHTML="❌ "+em;
+        status.innerHTML="❌ API Key ไม่ถูกต้องค่ะ";
+      else status.innerHTML="❌ "+em;
       return;
     }
-
     const text=(data.content?.[0]?.text)||"";
     if(!text.trim()||text.startsWith("ERROR:")){
       status.className="ai-status error";
@@ -1692,7 +1681,6 @@ async function scanImageWithAI(dataUrl){
     status.className="ai-status";
     status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
     setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
-
   }catch(err){
     status.className="ai-status error";
     status.innerHTML="❌ "+err.message;
@@ -1817,6 +1805,31 @@ async function debugApiKey(){
 
   status.className="ai-status";
   status.innerHTML=lines.join("<br>");
+}
+
+/* ── INLINE API KEY ── */
+function saveInlineKey(val){
+  val=val.trim();
+  const statusEl=document.getElementById("inlineKeyStatus");
+  if(!val){localStorage.removeItem("_ck");statusEl.textContent="";return;}
+  localStorage.setItem("_ck",val);
+  statusEl.textContent="✅";
+  statusEl.style.color="#43A047";
+}
+function loadInlineKey(){
+  const k=localStorage.getItem("_ck")||"";
+  const inp=document.getElementById("inlineApiKey");
+  const statusEl=document.getElementById("inlineKeyStatus");
+  if(!inp)return;
+  if(k){
+    inp.value=k;
+    statusEl.textContent="✅";
+    statusEl.style.color="#43A047";
+    // ซ่อนช่องถ้ามี key แล้ว (เห็นแค่ตอนไม่มี key)
+    if(uid && uid!=="Ud34d5368a1156dfd06330fe752b85cca"){
+      document.getElementById("apiKeySection").style.display="none";
+    }
+  }
 }
 </script>
 </body>

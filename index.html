@@ -1610,12 +1610,30 @@ async function scanImageWithAI(dataUrl){
   status.style.display="block"; status.className="ai-status loading";
   status.innerHTML="⏳ กำลังเตรียมรูป...";
 
-  // ดึง key จาก localStorage (ถูก set ตอน showApp โดยอัตโนมัติ)
+  // ดึง key จาก localStorage
   const claudeKey=localStorage.getItem("_ck")||"";
   if(!claudeKey){
+    // ถ้าไม่มี key ลอง fetch จาก GAS ใหม่อีกครั้ง
+    status.innerHTML="⏳ กำลังโหลด API Key...";
+    try{
+      const kr=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid})});
+      const kd=await kr.json();
+      if(kd.result) localStorage.setItem("_ck", kd.result);
+      else {
+        status.className="ai-status error";
+        status.innerHTML='❌ ยังไม่ได้ตั้งค่า API Key ค่ะ<br><small>Admin กรุณาไปที่ ⚙️ ตั้งค่า → บันทึก API Key ก่อนนะคะ</small>';
+        return;
+      }
+    }catch(e){
+      status.className="ai-status error";
+      status.innerHTML="❌ โหลด Key ไม่ได้: "+e.message; return;
+    }
+  }
+
+  const finalKey=localStorage.getItem("_ck")||"";
+  if(!finalKey){
     status.className="ai-status error";
-    status.innerHTML="❌ ระบบยังไม่พร้อม ลองปิดแล้วเปิดใหม่ค่ะ";
-    return;
+    status.innerHTML="❌ ไม่มี API Key ค่ะ Admin กรุณาตั้งค่าก่อน"; return;
   }
 
   // บีบรูป max 500px quality 0.6
@@ -1628,7 +1646,7 @@ async function scanImageWithAI(dataUrl){
     const c=document.createElement("canvas"); c.width=w; c.height=h;
     c.getContext("2d").drawImage(img2,0,0,w,h);
     finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
-  }catch(e){}
+  }catch(e){console.warn("resize:",e);}
 
   const sizeKB=Math.round(finalB64.length*0.75/1024);
   status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
@@ -1638,7 +1656,7 @@ async function scanImageWithAI(dataUrl){
       method:"POST",
       headers:{
         "Content-Type":"application/json",
-        "x-api-key":claudeKey,
+        "x-api-key":finalKey,
         "anthropic-version":"2023-06-01",
         "anthropic-dangerous-direct-browser-access":"true"
       },
@@ -1651,16 +1669,20 @@ async function scanImageWithAI(dataUrl){
         ]}]
       })
     });
+
     const data=await res.json();
     if(data.error){
       status.className="ai-status error";
-      const em=data.error.message||"";
+      const em=data.error.message||JSON.stringify(data.error);
       if(em.includes("credit")||em.includes("billing"))
-        status.innerHTML="❌ เครดิต API หมดค่ะ";
+        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
+      else if(em.includes("api-key")||em.includes("auth")||em.includes("invalid"))
+        status.innerHTML="❌ API Key ไม่ถูกต้อง Admin กรุณาตั้งค่าใหม่ที่ ⚙️";
       else
         status.innerHTML="❌ "+em;
       return;
     }
+
     const text=(data.content?.[0]?.text)||"";
     if(!text.trim()||text.startsWith("ERROR:")){
       status.className="ai-status error";
@@ -1670,6 +1692,7 @@ async function scanImageWithAI(dataUrl){
     status.className="ai-status";
     status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
     setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
+
   }catch(err){
     status.className="ai-status error";
     status.innerHTML="❌ "+err.message;

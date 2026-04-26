@@ -293,52 +293,6 @@ input:focus,select:focus{outline:none;border-color:var(--teal);}
 .ai-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--text-l);font-size:12px;font-weight:700;}
 .ai-divider::before,.ai-divider::after{content:"";flex:1;height:1px;background:var(--teal-pp);}
 
-
-async function scanImageWithAI(dataUrl){
-  const status=document.getElementById("aiStatus");
-  status.style.display="block"; status.className="ai-status loading";
-  status.innerHTML="⏳ กำลังเตรียมรูป...";
-
-  let finalB64=dataUrl.split(",")[1];
-  try{
-    const img2=new Image(); img2.src=dataUrl;
-    await new Promise(r=>{img2.onload=r;});
-    const MAX=500; let w=img2.width,h=img2.height;
-    if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}
-    const c=document.createElement("canvas"); c.width=w; c.height=h;
-    c.getContext("2d").drawImage(img2,0,0,w,h);
-    finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
-  }catch(e){console.warn("resize:",e);}
-
-  const sizeKB=Math.round(finalB64.length*0.75/1024);
-  status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
-
-  try{
-    const res=await fetch(GAS,{
-      method:"POST",
-      body:JSON.stringify({action:"scanImage",userId:uid,imageBase64:finalB64,mediaType:"image/jpeg"})
-    });
-    const data=await res.json();
-    console.log("scanImage:",JSON.stringify(data).slice(0,200));
-    if(data.error){
-      status.className="ai-status error";
-      status.innerHTML="❌ "+data.error; return;
-    }
-    const text=data.result||"";
-    if(!text.trim()||text.startsWith("ERROR:")){
-      status.className="ai-status error";
-      status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปให้ชัดขึ้นนะคะ"; return;
-    }
-    document.getElementById("importText").value=text.trim();
-    status.className="ai-status";
-    status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
-    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
-  }catch(err){
-    console.error("scanImage err:",err);
-    status.className="ai-status error";
-    status.innerHTML="❌ "+err.message;
-  }
-}
 /* ── AI IMAGE SCAN ── */
 .ai-upload-box{border:2.5px dashed var(--teal-pp);border-radius:16px;padding:20px 16px;text-align:center;cursor:pointer;background:linear-gradient(135deg,#FFF8F5,#FFF3EE);transition:all .2s;position:relative;margin-bottom:12px;}
 .ai-upload-box:hover{border-color:var(--teal-d);background:#FFF3EE;}
@@ -490,14 +444,14 @@ async function scanImageWithAI(dataUrl){
         <div class="card-title">📋 นำเข้าตารางเวร</div>
 
         <!-- AI IMAGE SCAN SECTION -->
-        <label for="calImgInput" class="ai-upload-box" style="display:block;cursor:pointer;">
-          <input type="file" id="calImgInput" accept="image/*"
-            style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"
-            onchange="handleCalImg(event)">
+        <div class="ai-upload-box" onclick="document.getElementById('calImgInput').click()">
+          <input type="file" id="calImgInput" accept="image/*" onchange="handleCalImg(event)">
           <div class="ai-upload-icon">📷</div>
           <div class="ai-upload-lbl">ถ่ายรูป / อัปโหลดรูปตารางเวร</div>
           <div class="ai-upload-sub">AI อ่านรูปแล้วแปลงเป็นข้อความให้อัตโนมัติ ✨</div>
-        </label>
+        </div>
+        <img id="calImgPreview" class="ai-preview-img">
+        <div class="ai-status" id="aiStatus"></div>
 
         <div class="ai-divider">หรือพิมพ์ / วางข้อความเอง</div>
 
@@ -735,10 +689,7 @@ function init(){
 
   liff.init({ liffId: "2009520328-4YznojXl" })
     .then(() => {
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return null;
-      }
+      if (!liff.isLoggedIn()) { liff.login(); return null; }
       return liff.getProfile();
     })
     .then(profile => {
@@ -755,19 +706,15 @@ function init(){
     })
     .catch(err => {
       const msg = err.message || JSON.stringify(err) || "";
-      if (msg.includes("expired") || msg.includes("401") ||
-          msg.includes("access token") || msg.includes("login") ||
-          msg.includes("Need") || msg.includes("unauthorized")) {
-        liff.login();
-        return;
+      if (msg.includes("expired")||msg.includes("401")||msg.includes("access token")||
+          msg.includes("login")||msg.includes("Need")||msg.includes("unauthorized")) {
+        liff.login(); return;
       }
       document.getElementById("loadingScreen").innerHTML = `
         <div style="text-align:center;padding:40px 24px;">
           <div style="font-size:48px;margin-bottom:16px;">🔒</div>
           <div style="font-size:17px;font-weight:800;color:#00838F;margin-bottom:8px;">กรุณาเปิดในแอป LINE</div>
-          <div style="font-size:13px;color:#546E7A;line-height:1.6;">
-            กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ
-          </div>
+          <div style="font-size:13px;color:#546E7A;line-height:1.6;">กรุณากดลิงก์จาก Rich Menu ใน LINE นะคะ</div>
           <div style="font-size:11px;color:#B0BEC5;margin-top:8px;">${msg}</div>
           <button onclick="liff.login()"
             style="margin-top:16px;padding:10px 24px;background:#00838F;color:white;border:none;border-radius:12px;font-size:14px;cursor:pointer;">
@@ -1142,18 +1089,10 @@ async function loadRate(){
   try{
     const r=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"getRate",userId:uid})});
     const data=await r.json();
-    if(data.result){
-      rate=data.result;
-      document.getElementById("rateDisp").textContent=rate.toLocaleString()+" ฿/ชม.";
-      document.getElementById("newRate").value=rate;
-    }
-    if(data.salary){
-      const sal=data.salary;
-      if(document.getElementById("salaryInput")) document.getElementById("salaryInput").value=sal;
-      if(document.getElementById("taxSalaryInput")){
-        document.getElementById("taxSalaryInput").value=sal;
-        calcTax();
-      }
+    if(data.result){rate=data.result;document.getElementById("rateDisp").textContent=rate.toLocaleString()+" ฿/ชม.";document.getElementById("newRate").value=rate;}
+    if(data.salary&&document.getElementById("salaryInput")){
+      document.getElementById("salaryInput").value=data.salary;
+      if(document.getElementById("taxSalaryInput")){document.getElementById("taxSalaryInput").value=data.salary;calcTax();}
     }
   }catch(e){}
 }
@@ -1163,8 +1102,7 @@ async function saveRate(){
   const sv=parseFloat(document.getElementById("salaryInput")?document.getElementById("salaryInput").value:0)||0;
   try{
     await fetch(GAS,{method:"POST",body:JSON.stringify({action:"updateRate",userId:uid,rate:rv,salary:sv})});
-    rate=rv;
-    document.getElementById("rateDisp").textContent=rv.toLocaleString()+" ฿/ชม.";
+    rate=rv;document.getElementById("rateDisp").textContent=rv.toLocaleString()+" ฿/ชม.";
     document.getElementById("editForm").style.display="none";
     if(sv>0&&document.getElementById("taxSalaryInput")){document.getElementById("taxSalaryInput").value=sv;calcTax();}
     showOv("","","บันทึกเรทใหม่: "+rv.toLocaleString()+" ฿/ชม. ✅");
@@ -1548,13 +1486,12 @@ function calcTax(){
 }
 async function fillOtFromData(){
   try{
-    const y=new Date().getFullYear();
+    const y2=new Date().getFullYear();
     const results=await Promise.all(Array.from({length:12},(_,i)=>
-      fetch(GAS,{method:"POST",body:JSON.stringify({action:"getDetail",userId:uid,year:y,month:i+1})})
+      fetch(GAS,{method:"POST",body:JSON.stringify({action:"getDetail",userId:uid,year:y2,month:i+1})})
         .then(r=>r.json()).then(d=>(d.records||[]).reduce((a,r)=>a+(parseFloat(r.money)||0),0)).catch(()=>0)
     ));
-    const totalOt=results.reduce((a,b)=>a+b,0);
-    document.getElementById("taxOtInput").value=Math.round(totalOt);
+    document.getElementById("taxOtInput").value=Math.round(results.reduce((a,b)=>a+b,0));
     calcTax();
   }catch(e){}
 }
@@ -1622,94 +1559,104 @@ async function handleCalImg(e){
   const file = e.target.files[0];
   if(!file) return;
 
-  const status = document.getElementById("aiStatus");
-  status.style.display = "block";
-  status.className = "ai-status loading";
-  status.innerHTML = "⏳ กำลังเตรียมรูป...";
+  // แสดง preview รูป
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const dataUrl = ev.target.result;
+    const preview = document.getElementById("calImgPreview");
+    preview.src = dataUrl;
+    preview.style.display = "block";
 
-  // Resize รูปก่อนส่ง (max 1200px, JPEG 0.85)
-  const resized = await resizeImage(file, 800, 0.7);
-
-  const preview = document.getElementById("calImgPreview");
-  preview.src = resized;
-  preview.style.display = "block";
-
-  await scanImageWithAI(resized);
+    // เริ่ม AI scan
+    await scanImageWithAI(dataUrl);
+  };
+  reader.readAsDataURL(file);
 }
 
-// Resize image ให้เล็กลงก่อนส่ง GAS
-function resizeImage(file, maxPx, quality){
-  return new Promise((resolve)=>{
-    const reader = new FileReader();
-    reader.onload = (ev)=>{
-      const img = new Image();
-      img.onload = ()=>{
-        let w = img.width, h = img.height;
-        if(w > maxPx || h > maxPx){
-          if(w > h){ h = Math.round(h * maxPx/w); w = maxPx; }
-          else      { w = Math.round(w * maxPx/h); h = maxPx; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
+async function scanImageWithAI(dataUrl){
+  const status=document.getElementById("aiStatus");
+  status.style.display="block"; status.className="ai-status loading";
+  status.innerHTML="⏳ กำลังเตรียมรูป...";
+  let finalB64=dataUrl.split(",")[1];
+  try{
+    const img2=new Image(); img2.src=dataUrl;
+    await new Promise(r=>{img2.onload=r;});
+    const MAX=500; let w=img2.width,h=img2.height;
+    if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}
+    const c=document.createElement("canvas"); c.width=w; c.height=h;
+    c.getContext("2d").drawImage(img2,0,0,w,h);
+    finalB64=c.toDataURL("image/jpeg",0.6).split(",")[1];
+  }catch(e){}
+  const sizeKB=Math.round(finalB64.length*0.75/1024);
+  status.innerHTML=`⏳ AI กำลังอ่านตารางเวร... (${sizeKB} KB)`;
+  try{
+    const res=await fetch(GAS,{method:"POST",
+      body:JSON.stringify({action:"scanImage",userId:uid,imageBase64:finalB64,mediaType:"image/jpeg"})
+    });
+    const data=await res.json();
+    if(data.error){status.className="ai-status error";status.innerHTML="❌ "+data.error;return;}
+    const text=data.result||"";
+    if(!text.trim()||text.startsWith("ERROR:")){
+      status.className="ai-status error";status.innerHTML="❌ อ่านรูปไม่ได้ค่ะ ลองถ่ายรูปให้ชัดขึ้น";return;
+    }
+    document.getElementById("importText").value=text.trim();
+    status.className="ai-status";
+    status.innerHTML="✅ อ่านตารางสำเร็จ! กด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
+    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
+  }catch(err){status.className="ai-status error";status.innerHTML="❌ "+err.message;}
 }
-
 
 /* ── AI IMAGE SCAN ── */
+async function handleCalImg(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    const dataUrl=ev.target.result;
+    const preview=document.getElementById("calImgPreview");
+    preview.src=dataUrl; preview.style.display="block";
+    await scanImageWithAI(dataUrl);
+  };
+  reader.readAsDataURL(file);
+}
 
-
-
-
-
-
+async function scanImageWithAI(dataUrl){
+  const status=document.getElementById("aiStatus");
+  status.style.display="block";
   status.className="ai-status loading";
-  status.innerHTML="⏳ กำลังทดสอบ API Key...";
-
+  status.innerHTML="⏳ AI กำลังอ่านตารางเวร...";
+  const [header,b64]=dataUrl.split(",");
+  const mimeMatch=header.match(/data:([^;]+)/);
+  const mediaType=mimeMatch?mimeMatch[1]:"image/jpeg";
   try{
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "x-api-key": key,
-        "anthropic-version":"2023-06-01",},
-      body: JSON.stringify({
-        model:"claude-haiku-4-5-20251001",
-        max_tokens:10,
-        messages:[{role:"user",content:"say hi"}]
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:1000,
+        messages:[{
+          role:"user",
+          content:[
+            {type:"image",source:{type:"base64",media_type:mediaType,data:b64}},
+            {type:"text",text:"จากรูปปฏิทินหรือตารางเวรนี้ ให้ดึงวันที่และชื่อเวรออกมา\n\nตอบในรูปแบบนี้เท่านั้น (บรรทัดละรายการ):\nd/m/yyyy ชื่อเวร\n\nกฎ:\n- เวรเช้า/Morning/C → เวรเช้า\n- เวรบ่าย/Afternoon/บ่าย → เวรบ่าย\n- เวรดึก/Night/ดึก → เวรดึก\n- คลินิก/Clinic → เวรคลินิก\n- วันหนึ่งมีหลายเวร = หลายบรรทัด\n- ไม่ต้องอธิบาย ตอบแค่รายการเวร\n- อ่านไม่ออก/ไม่มีตาราง → ตอบ ERROR: ไม่พบตารางเวร"}
+          ]
+        }]
       })
     });
-    const data = await res.json();
-    console.log("scan response:", JSON.stringify(data));
-    if(data.error){
-      const em = data.error.message||"";
+    const data=await res.json();
+    const text=data.content?.[0]?.text||"";
+    if(!text.trim()||text.startsWith("ERROR:")){
       status.className="ai-status error";
-      if(em.includes("credit")||em.includes("billing"))
-        status.innerHTML="❌ เครดิต API หมดค่ะ เติมที่ console.anthropic.com";
-      else if(em.includes("api-key")||em.includes("auth")||em.includes("invalid"))
-        status.innerHTML="❌ API Key ไม่ถูกต้องค่ะ";
-      else
-        status.innerHTML="❌ Error: "+em;
-    } else if(data.content){
-      status.className="ai-status";
-      status.innerHTML="✅ API Key ใช้งานได้! พร้อมอ่านรูปตารางเวรค่ะ";
-    } else {
-      status.className="ai-status error";
-      status.innerHTML="⚠️ ไม่แน่ใจ: "+JSON.stringify(data).slice(0,80);
+      status.innerHTML="❌ "+(text||"อ่านรูปไม่ได้ค่ะ ลองรูปอื่น");
+      return;
     }
+    document.getElementById("importText").value=text.trim();
+    status.className="ai-status";
+    status.innerHTML="✅ อ่านตารางสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
+    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
   }catch(err){
-    console.error("scan error:", err);
     status.className="ai-status error";
-    if(err.message.includes("Failed to fetch")){
-      status.innerHTML="❌ เชื่อมต่อ Anthropic ไม่ได้ค่ะ<br><small>อาจเป็นเพราะ LIFF browser block — ลองเปิดใน Safari/Chrome แทน</small>";
-    } else {
-      status.innerHTML="❌ "+err.message;
-    }
+    status.innerHTML="❌ เกิดข้อผิดพลาด: "+err.message;
   }
 }
 </script>

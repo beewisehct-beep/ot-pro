@@ -747,11 +747,13 @@ function showApp(){
   document.getElementById("appContainer").style.display="";
   const sv=localStorage.getItem("ot_cin");
   if(sv){cinTime=new Date(sv);setWorking(true);setSpeech(WORK);document.getElementById("zzzSpan").style.display="none";}
-  // ดึง Claude API Key จาก GAS แบบ silent (ผู้ใช้ไม่เห็น)
-  fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid})})
-    .then(r=>r.json())
-    .then(d=>{if(d.result)localStorage.setItem("_ck",d.result);})
-    .catch(()=>{});
+  // ดึง key จาก GAS ถ้า localStorage ยังว่าง
+  if(!localStorage.getItem("_ck")){
+    fetch(GAS,{method:"POST",body:JSON.stringify({action:"getApiKey",userId:uid})})
+      .then(r=>r.json())
+      .then(d=>{if(d.result)localStorage.setItem("_ck",d.result);})
+      .catch(()=>{});
+  }
   loadRate();
   loadSummary();
 }
@@ -1736,18 +1738,16 @@ async function scanImageWithAI(dataUrl){
 async function saveAdminKey(){
   const key=document.getElementById("adminKeyInput").value.trim();
   if(!key||!key.startsWith("sk-ant-")){alert("Key ไม่ถูกต้องค่ะ");return;}
-  try{
-    const res=await fetch(GAS,{method:"POST",body:JSON.stringify({action:"saveApiKey",userId:uid,apiKey:key})});
-    const data=await res.json();
-    if(data.result==="ok"){
-      localStorage.setItem("_ck",key);
-      document.getElementById("adminKeyStatus").textContent="✅ บันทึกแล้ว ("+key.slice(0,15)+"...)";
-      document.getElementById("adminKeyInput").value="";
-      showOv("","","บันทึก API Key ลง GAS แล้วค่ะ ✅");
-    } else {
-      alert("บันทึกไม่สำเร็จ: "+JSON.stringify(data));
-    }
-  }catch(e){alert("Error: "+e.message);}
+
+  // บันทึก localStorage ทันที — ไม่ต้องรอ GAS
+  localStorage.setItem("_ck", key);
+  document.getElementById("adminKeyStatus").textContent="✅ บันทึกแล้ว";
+  document.getElementById("adminKeyInput").value="";
+  showOv("","","บันทึก API Key แล้วค่ะ ✅\nพร้อมอ่านรูปตารางเวรได้เลย!");
+
+  // พยายามบันทึก GAS ด้วย (optional — ไม่ block)
+  fetch(GAS,{method:"POST",body:JSON.stringify({action:"saveApiKey",userId:uid,apiKey:key})})
+    .catch(()=>{});
 }
 </script>
 </body>

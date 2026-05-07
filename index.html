@@ -1680,60 +1680,6 @@ async function scanImageWithAI(dataUrl){
   }
 }
 
-/* ── AI IMAGE SCAN ── */
-async function handleCalImg(e){
-  const file=e.target.files[0]; if(!file)return;
-  const reader=new FileReader();
-  reader.onload=async(ev)=>{
-    const dataUrl=ev.target.result;
-    const preview=document.getElementById("calImgPreview");
-    preview.src=dataUrl; preview.style.display="block";
-    await scanImageWithAI(dataUrl);
-  };
-  reader.readAsDataURL(file);
-}
-
-async function scanImageWithAI(dataUrl){
-  const status=document.getElementById("aiStatus");
-  status.style.display="block";
-  status.className="ai-status loading";
-  status.innerHTML="⏳ AI กำลังอ่านตารางเวร...";
-  const [header,b64]=dataUrl.split(",");
-  const mimeMatch=header.match(/data:([^;]+)/);
-  const mediaType=mimeMatch?mimeMatch[1]:"image/jpeg";
-  try{
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        model:"claude-sonnet-4-20250514",
-        max_tokens:1000,
-        messages:[{
-          role:"user",
-          content:[
-            {type:"image",source:{type:"base64",media_type:mediaType,data:b64}},
-            {type:"text",text:"จากรูปปฏิทินหรือตารางเวรนี้ ให้ดึงวันที่และชื่อเวรออกมา\n\nตอบในรูปแบบนี้เท่านั้น (บรรทัดละรายการ):\nd/m/yyyy ชื่อเวร\n\nกฎ:\n- เวรเช้า/Morning/C → เวรเช้า\n- เวรบ่าย/Afternoon/บ่าย → เวรบ่าย\n- เวรดึก/Night/ดึก → เวรดึก\n- คลินิก/Clinic → เวรคลินิก\n- วันหนึ่งมีหลายเวร = หลายบรรทัด\n- ไม่ต้องอธิบาย ตอบแค่รายการเวร\n- อ่านไม่ออก/ไม่มีตาราง → ตอบ ERROR: ไม่พบตารางเวร"}
-          ]
-        }]
-      })
-    });
-    const data=await res.json();
-    const text=data.content?.[0]?.text||"";
-    if(!text.trim()||text.startsWith("ERROR:")){
-      status.className="ai-status error";
-      status.innerHTML="❌ "+(text||"อ่านรูปไม่ได้ค่ะ ลองรูปอื่น");
-      return;
-    }
-    document.getElementById("importText").value=text.trim();
-    status.className="ai-status";
-    status.innerHTML="✅ อ่านตารางสำเร็จ! ตรวจสอบแล้วกด วิเคราะห์ตาราง ได้เลยค่ะ 🎉";
-    setTimeout(()=>document.getElementById("importText").scrollIntoView({behavior:"smooth",block:"center"}),300);
-  }catch(err){
-    status.className="ai-status error";
-    status.innerHTML="❌ เกิดข้อผิดพลาด: "+err.message;
-  }
-}
-
 /* ── ADMIN API KEY MANAGEMENT ── */
 async function saveAdminKey(){
   const key=document.getElementById("adminKeyInput").value.trim();
